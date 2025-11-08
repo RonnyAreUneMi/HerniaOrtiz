@@ -1,146 +1,157 @@
-# ==================== IMPORTS ====================
-# Librerías estándar
-import os
-import hashlib
-import tempfile
+# ==================== VISTAS ====================
+"""
+Módulo de vistas para la aplicación Hernia.
+Gestiona las solicitudes HTTP y coordina con los servicios.
+"""
+
+import logging
 from io import BytesIO
 
-# Django core
+import pytz
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.contrib.auth.views import PasswordResetCompleteView
-from django.core.exceptions import ObjectDoesNotExist
-from django.core.files.storage import default_storage
-from django.core.mail import send_mail
 from django.core.paginator import Paginator
-from django.http import HttpResponse, JsonResponse
+from django.db import transaction
+from django.http import HttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.cache import cache_control
+from django.views.decorators.http import require_http_methods
 
-# ReportLab
-from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
-from reportlab.lib.units import inch
-from reportlab.lib.colors import HexColor
-from reportlab.lib import colors
-from reportlab.platypus import Table, TableStyle
-
-# Procesamiento de imágenes
-from PIL import Image, ImageDraw
-import cv2
-import numpy as np
-
-# Utilidades
-import pytz
-import requests
-from inference_sdk import InferenceHTTPClient
-
-# Locales
 from .forms import ImagenForm, RegistroForm, ProfileForm, UserForm
 from .models import Imagen, Profile, Historial
-
-
-# ==================== CONFIGURACIÓN ====================
-CLIENT = InferenceHTTPClient(
-    api_url="https://outline.roboflow.com",
-    api_key="8HZzIhc5cRGKVeheO0R7"
+from .services import (
+    ImageProcessingService, 
+    HistorialService, 
+    ImageValidator,
+    get_inference_client
 )
+from .auth_service import AuthenticationService
+from .pdf_service import InformeRadiologicoGenerator, HistorialGeneralGenerator
+from .config import PAGINATION, ECUADOR_TIMEZONE
+
+logger = logging.getLogger(__name__)
 
 
 # ==================== AUTENTICACIÓN ====================
 class CustomPasswordResetCompleteView(PasswordResetCompleteView):
+    """Vista personalizada para completar reset de contraseña."""
+    
     def get(self, request, *args, **kwargs):
         return redirect('login')
 
 
 @cache_control(no_cache=True, must_revalidate=True, no_store=True)
+@require_http_methods(["GET", "POST"])
 def login_view(request):
+    """
+    Vista de login.
+    Autentica usuarios por email y contraseña.
+    """
     if request.method == 'POST':
-        email = request.POST.get('email')
-        password = request.POST.get('password')
+        email = request.POST.get('email', '').strip()
+        password = request.POST.get('password', '')
         
-        try:
-            user = User.objects.get(email=email)
-            user = authenticate(request, username=user.username, password=password)
-            if user is not None:
-                login(request, user)
-                return redirect('index')
-            else:
-                messages.error(request, 'Correo electrónico o contraseña incorrectos.')
-        except User.DoesNotExist:
-            messages.error(request, 'Correo electrónico o contraseña incorrectos.')
+        user, error = AuthenticationService.authenticate_by_email(email, password)
+        
+        if user is not None:
+            login(request, user)
+            return redirect('index')
+        else:
+            messages.error(request, error)
     
-    return render(request, 'login.html')
+    return render(request, 'auth/login.html')
 
 
+@require_http_methods(["GET", "POST"])
 def register_view(request):
+    """
+    Vista de registro.
+    Crea nuevos usuarios y los autentica automáticamente.
+    """
     if request.method == 'POST':
         form = RegistroForm(request.POST)
-        if form.is_valid():
-            try:
-                user = form.save()
-                login(request, user)
-                messages.success(request, '¡Registro exitoso! Has iniciado sesión automáticamente.')
-                return redirect('index')
-            except Exception as e:
-                messages.error(request, f'Error al registrar el usuario: {e}')
+        user, error = AuthenticationService.register_user(form)
+        
+        if user is not None:
+            login(request, user)
+            messages.success(request, '¡Registro exitoso! Has iniciado sesión automáticamente.')
+            return redirect('index')
         else:
-            for field, errors in form.errors.items():
-                for error in errors:
-                    messages.error(request, error)
+            messages.error(request, error)
     else:
         form = RegistroForm()
     
-    return render(request, 'register.html', {'form': form})
+    return render(request, 'auth/register.html', {'form': form})
 
 
 @cache_control(no_cache=True, must_revalidate=True, no_store=True)
+@require_http_methods(["GET", "POST"])
 def logout_view(request):
+    """Vista de logout."""
     logout(request)
     return redirect('login')
 
 
+@require_http_methods(["GET", "POST"])
 def password_reset_view(request):
+    """
+    Vista de recuperación de contraseña.
+    Envía un enlace de reset al email del usuario.
+    """
     if request.method == 'POST':
-        email = request.POST.get('email')
-        try:
-            user = User.objects.get(email=email)
-            messages.success(request, 'Se ha enviado un enlace para restablecer la contraseña a tu correo electrónico.')
-            return redirect('password_reset')
-        except User.DoesNotExist:
-            messages.error(request, 'El correo electrónico no está registrado en nuestro sistema.')
-    return render(request, 'password_reset.html')
+        email = request.POST.get('email', '').strip()
+        success, message = AuthenticationService.send_password_reset_email(email)
+        
+        if success:
+            messages.success(request, message)
+        else:
+            messages.error(request, message)
+        
+        return redirect('password_reset')
+    
+    return render(request, 'auth/password_reset.html')
 
 
 # ==================== VISTAS PRINCIPALES ====================
 @login_required
 @cache_control(no_cache=True, must_revalidate=True, no_store=True)
 def index(request):
-    if not request.session.get('welcome_message_shown', False):
+    """
+    Vista principal (home).
+    Muestra mensaje de bienvenida en la primera visita.
+    """
+    show_welcome_message = not request.session.get('welcome_message_shown', False)
+    
+    if show_welcome_message:
         request.session['welcome_message_shown'] = True
-        show_welcome_message = True
-    else:
-        show_welcome_message = False
-
-    return render(request, 'home.html', {
+    
+    return render(request, 'dashboard/home.html', {
         'user': request.user,
         'show_welcome_message': show_welcome_message,
     })
 
 
 @login_required
+@require_http_methods(["GET"])
 def resultados(request):
-    return render(request, 'resultados.html')
+    """Vista de resultados (plantilla base)."""
+    return render(request, 'imagen/resultados.html')
 
 
 @login_required
+@require_http_methods(["GET"])
 def ver_resultado(request, id):
+    """
+    Vista para ver un resultado específico.
+    Solo permite ver resultados propios del usuario.
+    """
     historial_item = get_object_or_404(Historial, id=id, user=request.user)
     
-    ecuador_tz = pytz.timezone('America/Guayaquil')
+    ecuador_tz = pytz.timezone(ECUADOR_TIMEZONE)
     fecha_imagen_local = historial_item.fecha_imagen.astimezone(ecuador_tz)
     
     context = {
@@ -152,576 +163,301 @@ def ver_resultado(request, id):
         'historial_id': historial_item.id
     }
     
-    return render(request, 'resultados.html', context)
+    return render(request, 'imagen/resultados.html', context)
 
 
 # ==================== PERFIL DE USUARIO ====================
 @login_required
+@require_http_methods(["GET", "POST"])
 def profile_view(request):
+    """
+    Vista de perfil de usuario.
+    Permite ver y editar información del perfil.
+    """
     if request.method == 'POST':
         user_form = UserForm(request.POST, instance=request.user)
         profile_form = ProfileForm(request.POST, request.FILES, instance=request.user.profile)
-
+        
         if user_form.is_valid() and profile_form.is_valid():
-            user_form.save()
-            profile_form.save()
+            with transaction.atomic():
+                user_form.save()
+                profile_form.save()
             messages.success(request, 'Perfil actualizado exitosamente.')
             return redirect('profile')
     else:
         user_form = UserForm(instance=request.user)
         profile_form = ProfileForm(instance=request.user.profile)
-
-    return render(request, 'perfil.html', {'user_form': user_form, 'profile_form': profile_form})
+    
+    return render(request, 'profile/perfil.html', {
+        'user_form': user_form,
+        'profile_form': profile_form
+    })
 
 
 @login_required
+@require_http_methods(["GET", "POST"])
 def editar_perfil(request):
-    if request.method == 'POST':
-        user_form = UserForm(request.POST, instance=request.user)
-        profile_form = ProfileForm(request.POST, request.FILES, instance=request.user.profile)
-        
-        if user_form.is_valid() and profile_form.is_valid():
-            user_form.save()
-            profile_form.save()
-            messages.success(request, 'Perfil actualizado exitosamente')
-            return redirect('profile')
-    else:
-        user_form = UserForm(instance=request.user)
-        profile_form = ProfileForm(instance=request.user.profile)
-
-    return render(request, 'editar_perfil.html', {'user_form': user_form, 'profile_form': profile_form})
+    """
+    Vista para editar perfil.
+    Redirige a profile_view (evita duplicación).
+    """
+    return profile_view(request)
 
 
 @login_required
+@require_http_methods(["GET"])
 def user_profile_view(request):
+    """
+    Vista de perfil de usuario (alternativa).
+    Crea perfil si no existe.
+    """
     user = request.user
     profile = getattr(user, 'profile', None)
-
+    
     if profile is None:
         profile = Profile.objects.create(user=user)
-
-    return render(request, 'perfil.html', {'user': user, 'profile': profile})
+    
+    return render(request, 'profile/perfil.html', {'user': user, 'profile': profile})
 
 
 # ==================== HISTORIAL MÉDICO ====================
 @login_required
+@require_http_methods(["GET"])
 def historial_medico(request):
+    """
+    Vista del historial médico del usuario.
+    Muestra solo los registros del usuario autenticado.
+    """
     historial = Historial.objects.filter(user=request.user).order_by('-fecha_imagen')
-    paginator = Paginator(historial, 4)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-    return render(request, 'historial_medico.html', {'page_obj': page_obj})
-
-
-@login_required
-def historial_medico_general(request):
-    historial = Historial.objects.all().order_by('-fecha_imagen')
-    paginator = Paginator(historial, 4)
+    paginator = Paginator(historial, PAGINATION['ITEMS_PER_PAGE'])
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     
-    return render(request, 'historial_medico_general.html', {'page_obj': page_obj})
+    return render(request, 'historial/historial_medico.html', {'page_obj': page_obj})
 
 
 @login_required
+@require_http_methods(["GET"])
+def historial_medico_general(request):
+    """
+    Vista del historial médico general.
+    Solo accesible para superusuarios.
+    """
+    if not request.user.is_superuser:
+        messages.error(request, 'No tienes permiso para acceder a esta sección.')
+        return redirect('historial_med')
+    
+    historial = Historial.objects.all().order_by('-fecha_imagen')
+    paginator = Paginator(historial, PAGINATION['ITEMS_PER_PAGE'])
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    return render(request, 'historial/historial_medico_general.html', {'page_obj': page_obj})
+
+
+@login_required
+@require_http_methods(["POST"])
 def eliminar_historial(request, id):
-    historial_item = get_object_or_404(Historial, id=id, user=request.user)
-
-    if request.method == "POST":
-        if historial_item.imagen:
-            historial_item.imagen.delete()
-        
-        historial_item.delete()
-        messages.success(request, 'El registro ha sido eliminado correctamente.')
-
+    """
+    Elimina un historial del usuario.
+    Solo permite eliminar registros propios.
+    """
+    try:
+        success = HistorialService.delete_historial(id, user=request.user)
+        if success:
+            messages.success(request, 'El registro ha sido eliminado correctamente.')
+        else:
+            messages.error(request, 'No se encontró el registro.')
+    except Exception as e:
+        logger.error(f"Error eliminando historial: {str(e)}")
+        messages.error(request, 'Error al eliminar el registro.')
+    
     return redirect('historial_med')
 
 
 @login_required
+@require_http_methods(["POST"])
 def eliminar_historial_general(request, id):
-    historial_item = get_object_or_404(Historial, id=id)
-
-    if request.method == "POST":
-        if historial_item.imagen:
-            historial_item.imagen.delete()
-        
-        historial_item.delete()
-        messages.success(request, 'El registro ha sido eliminado correctamente.')
-
+    """
+    Elimina un historial (acceso general).
+    Solo accesible para superusuarios.
+    """
+    if not request.user.is_superuser:
+        messages.error(request, 'No tienes permiso para realizar esta acción.')
+        return redirect('historial_med_gene')
+    
+    try:
+        success = HistorialService.delete_historial(id)
+        if success:
+            messages.success(request, 'El registro ha sido eliminado correctamente.')
+        else:
+            messages.error(request, 'No se encontró el registro.')
+    except Exception as e:
+        logger.error(f"Error eliminando historial general: {str(e)}")
+        messages.error(request, 'Error al eliminar el registro.')
+    
     return redirect('historial_med_gene')
 
 
-def guardar_resultados(request):
-    if request.method == 'POST':
-        historial = Historial(
-            user=request.user,
-            paciente_nombre=request.POST.get('paciente_nombre'),
-            imagen=request.FILES.get('imagen'),
-            porcentaje=request.POST.get('porcentaje'),
-            grupo=request.POST.get('grupo'),
-            pdf_url=request.POST.get('pdf_url')
-        )
-        historial.save()
-        return redirect('resultados')
-
-
 # ==================== PROCESAMIENTO DE IMÁGENES ====================
+@login_required
+@require_http_methods(["GET", "POST"])
 def subir_imagen(request):
+    """
+    Vista para subir y procesar imágenes.
+    Realiza inferencia y genera historial.
+    """
     if request.method == 'POST':
         form = ImagenForm(request.POST, request.FILES)
-        if form.is_valid():
-            imagen_obj = form.save(commit=False)
-            paciente_nombre = form.cleaned_data.get('paciente_nombre')
-            original_name = request.FILES['imagen'].name
-            hash_object = hashlib.sha256(original_name.encode())
-            encrypted_name = hash_object.hexdigest() + '.' + original_name.split('.')[-1]
-            imagen_obj.imagen.name = encrypted_name
-            
-            imagen_obj.paciente_nombre = paciente_nombre
-            imagen_obj.save()
-
-            image_url = imagen_obj.imagen.url
-            response = requests.get(image_url)
-            image_data = BytesIO(response.content)
-
-            image_pil = Image.open(image_data).convert('RGB')
-            img_cv2 = np.array(image_pil)
-            img_cv2 = cv2.cvtColor(img_cv2, cv2.COLOR_RGB2BGR)
-
-            result = CLIENT.infer(image_url, model_id="proy_2/1")
-            predictions = result.get('predictions', [])
-
-            for pred in predictions:
-                confidence = pred['confidence'] * 100
-                class_name = pred['class']
-
-                if 'points' in pred:
-                    points = np.array([[p['x'], p['y']] for p in pred['points']], dtype=np.int32)
-
-                    overlay = img_cv2.copy()
-                    cv2.fillPoly(overlay, [points], (0, 0, 255))
-                    alpha = 0.4
-                    cv2.addWeighted(overlay, alpha, img_cv2, 1 - alpha, 0, img_cv2)
-
-                    color = (0, 255, 0) if class_name == 'Sin Hernia' else (255, 0, 0)
-                    cv2.polylines(img_cv2, [points], isClosed=True, color=color, thickness=2)
-
-                    x_min = min(points[:, 0])
-                    y_min = min(points[:, 1])
-                    text = f"{class_name} {confidence:.2f}%"
-                    cv2.putText(img_cv2, text, (x_min, y_min - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
-
-            img_pil_final = Image.fromarray(cv2.cvtColor(img_cv2, cv2.COLOR_BGR2RGB))
-            buffer = BytesIO()
-            img_pil_final.save(buffer, format="JPEG")
-            buffer.seek(0)
-
-            imagen_obj.imagen.save(encrypted_name, buffer)
-
-            if result['predictions'] and result['predictions'][0]['class']:
-                class_prediction = result['predictions'][0]['class']
-                grupo = "Sin Hernia" if class_prediction == 'Sin Hernia' else "Hernia"
-            else:
-                grupo = "Predicción no encontrada."
-
-            porcentaje = round(result['predictions'][0]['confidence'] * 100, 2) if result['predictions'] else 0
-            
-            ecuador_tz = pytz.timezone('America/Guayaquil')
-            fecha_imagen_local = imagen_obj.fecha.astimezone(ecuador_tz)
-            
-            historial = Historial(
-                user=request.user,
-                imagen=imagen_obj.imagen,
-                porcentaje=porcentaje,
-                grupo=grupo,
-                paciente_nombre=paciente_nombre,
-                fecha_imagen=fecha_imagen_local,
-            )
-            historial.save()
-
-            context = {
-                'grupo': grupo,
-                'porcentaje': porcentaje,
-                'original_image_url': image_url,
-                'processed_image_url': imagen_obj.imagen.url,
-                'fecha_imagen': fecha_imagen_local,
-                'paciente_nombre': paciente_nombre
-            }
-
-            return render(request, 'resultados.html', context)
+        
+        if not form.is_valid():
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, str(error))
+            return render(request, 'imagen/subir_imagen.html', {'form': form})
+        
+        # Validar imagen
+        imagen_file = request.FILES.get('imagen')
+        is_valid, error_msg = ImageValidator.validate_image(imagen_file)
+        
+        if not is_valid:
+            messages.error(request, error_msg)
+            return render(request, 'imagen/subir_imagen.html', {'form': form})
+        
+        try:
+            with transaction.atomic():
+                # Procesar imagen
+                imagen_obj = form.save(commit=False)
+                paciente_nombre = form.cleaned_data.get('paciente_nombre')
+                
+                # Generar nombre encriptado
+                encrypted_name = ImageProcessingService.generate_encrypted_filename(
+                    imagen_file.name
+                )
+                imagen_obj.imagen.name = encrypted_name
+                imagen_obj.paciente_nombre = paciente_nombre
+                imagen_obj.save()
+                
+                # Descargar y procesar imagen
+                image_url = imagen_obj.imagen.url
+                image_pil = ImageProcessingService.download_image(image_url)
+                
+                if image_pil is None:
+                    messages.error(request, 'Error al procesar la imagen.')
+                    return render(request, 'imagen/subir_imagen.html', {'form': form})
+                
+                # Convertir a OpenCV
+                import cv2
+                import numpy as np
+                img_cv2 = np.array(image_pil)
+                img_cv2 = cv2.cvtColor(img_cv2, cv2.COLOR_RGB2BGR)
+                
+                # Realizar inferencia
+                result = ImageProcessingService.get_inference_result(image_url)
+                
+                if result is None:
+                    messages.error(request, 'Error al procesar la imagen con el modelo.')
+                    return render(request, 'imagen/subir_imagen.html', {'form': form})
+                
+                # Dibujar predicciones
+                predictions = result.get('predictions', [])
+                img_cv2 = ImageProcessingService.draw_predictions_on_image(img_cv2, predictions)
+                
+                # Guardar imagen procesada
+                buffer = ImageProcessingService.save_processed_image(img_cv2)
+                imagen_obj.imagen.save(encrypted_name, buffer)
+                
+                # Extraer datos de predicción
+                grupo, porcentaje = ImageProcessingService.extract_prediction_data(result)
+                
+                # Crear historial
+                historial = HistorialService.create_historial_from_image(
+                    request.user,
+                    imagen_obj,
+                    paciente_nombre,
+                    grupo,
+                    porcentaje
+                )
+                
+                # Preparar contexto
+                ecuador_tz = pytz.timezone(ECUADOR_TIMEZONE)
+                fecha_local = imagen_obj.fecha.astimezone(ecuador_tz)
+                
+                context = {
+                    'grupo': grupo,
+                    'porcentaje': porcentaje,
+                    'original_image_url': image_url,
+                    'processed_image_url': imagen_obj.imagen.url,
+                    'fecha_imagen': fecha_local,
+                    'paciente_nombre': paciente_nombre
+                }
+                
+                messages.success(request, 'Imagen procesada exitosamente.')
+                return render(request, 'imagen/resultados.html', context)
+        
+        except Exception as e:
+            logger.error(f"Error procesando imagen: {str(e)}")
+            messages.error(request, 'Error al procesar la imagen. Intenta nuevamente.')
+            return render(request, 'imagen/subir_imagen.html', {'form': form})
+    
     else:
         form = ImagenForm()
-
-    return render(request, 'subir_imagen.html', {'form': form})
+    
+    return render(request, 'imagen/subir_imagen.html', {'form': form})
 
 
 # ==================== GENERACIÓN DE PDFs ====================
+@login_required
+@require_http_methods(["GET"])
 def generar_pdf_fila(request, id):
-    buffer = BytesIO()
-    p = canvas.Canvas(buffer, pagesize=letter)
-    width, height = letter
-    
-    item = get_object_or_404(Historial, id=id)
-    ecuador_tz = pytz.timezone('America/Guayaquil')
-    fecha_imagen_local = item.fecha_imagen.astimezone(ecuador_tz)
-    
-    azul_oscuro = HexColor('#1a2332')
-    azul_medio = HexColor('#2c3e50')
-    gris_texto = HexColor('#2d3748')
-    gris_linea = HexColor('#cbd5e0')
-    verde_clinico = HexColor('#059669')
-    rojo_clinico = HexColor('#dc2626')
-    fondo_claro = HexColor('#f8fafc')
-    
-    # Encabezado
-    p.setFillColor(azul_oscuro)
-    p.rect(0, height - 0.9*inch, width, 0.9*inch, fill=1, stroke=0)
-    
-    p.setFillColor(colors.white)
-    p.setFont("Helvetica-Bold", 18)
-    p.drawString(0.6*inch, height - 0.45*inch, "INFORME RADIOLÓGICO")
-    
-    p.setFont("Helvetica", 9)
-    p.drawString(0.6*inch, height - 0.65*inch, "Departamento de Diagnóstico por Imagen")
-    
-    p.setFont("Helvetica", 8)
-    p.drawRightString(width - 0.6*inch, height - 0.45*inch, f"No. {str(item.id).zfill(6)}")
-    p.drawRightString(width - 0.6*inch, height - 0.65*inch, fecha_imagen_local.strftime('%d/%m/%Y - %H:%M'))
-    
-    p.setStrokeColor(gris_linea)
-    p.setLineWidth(0.5)
-    p.line(0.6*inch, height - 0.95*inch, width - 0.6*inch, height - 0.95*inch)
-    
-    # Imagen radiológica
-    img_x = 0.6*inch
-    img_y = height - 9.8*inch
-    img_width = 4.2*inch
-    img_height = 7.8*inch
-    
-    if item.imagen:
-        p.setStrokeColor(gris_linea)
-        p.setLineWidth(1)
-        p.rect(img_x, img_y, img_width, img_height, stroke=1, fill=0)
+    """
+    Genera un PDF con el informe radiológico de un historial.
+    Solo permite generar PDFs de registros propios.
+    """
+    try:
+        historial = get_object_or_404(Historial, id=id, user=request.user)
         
-        try:
-            image_url = item.imagen.url
-            response = requests.get(image_url)
-            
-            if response.status_code == 200 and response.content:
-                image_data = BytesIO(response.content)
-                img = Image.open(image_data).convert('RGB')
-                
-                with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as temp_file:
-                    img.save(temp_file, format='JPEG')
-                    temp_file_path = temp_file.name
-                
-                p.drawImage(temp_file_path, img_x + 0.05*inch, img_y + 0.05*inch, 
-                          width=img_width - 0.1*inch, height=img_height - 0.1*inch, 
-                          preserveAspectRatio=True, mask='auto')
-                os.remove(temp_file_path)
-        except Exception as e:
-            p.setFillColor(gris_texto)
-            p.setFont("Helvetica", 9)
-            p.drawCentredString(img_x + img_width/2, img_y + img_height/2, "Imagen no disponible")
-    
-    p.setFillColor(azul_medio)
-    p.setFont("Helvetica", 8)
-    p.drawString(img_x, img_y - 0.25*inch, "Fig. 1 - Radiografía de tórax con marcación automatizada")
-    
-    # Información clínica
-    right_x = 5.1*inch
-    y_pos = height - 1.3*inch
-    box_width = 2.9*inch
-    
-    # Datos del paciente
-    p.setFillColor(fondo_claro)
-    p.rect(right_x, y_pos - 1.35*inch, box_width, 1.35*inch, fill=1, stroke=0)
-    
-    p.setStrokeColor(gris_linea)
-    p.setLineWidth(0.5)
-    p.rect(right_x, y_pos - 1.35*inch, box_width, 1.35*inch, fill=0, stroke=1)
-    
-    p.setFillColor(azul_medio)
-    p.setFont("Helvetica-Bold", 9)
-    p.drawString(right_x + 0.15*inch, y_pos - 0.25*inch, "DATOS DEL PACIENTE")
-    
-    p.setStrokeColor(azul_medio)
-    p.setLineWidth(1.5)
-    p.line(right_x + 0.15*inch, y_pos - 0.35*inch, right_x + 1.5*inch, y_pos - 0.35*inch)
-    
-    p.setFillColor(gris_texto)
-    p.setFont("Helvetica-Bold", 8)
-    p.drawString(right_x + 0.15*inch, y_pos - 0.55*inch, "Paciente:")
-    p.setFont("Helvetica", 8)
-    p.drawString(right_x + 0.15*inch, y_pos - 0.7*inch, item.paciente_nombre)
-    
-    p.setFont("Helvetica-Bold", 8)
-    p.drawString(right_x + 0.15*inch, y_pos - 0.9*inch, "Médico solicitante:")
-    p.setFont("Helvetica", 8)
-    p.drawString(right_x + 0.15*inch, y_pos - 1.05*inch, item.user.username)
-    
-    p.setFont("Helvetica", 7)
-    p.setFillColor(HexColor('#64748b'))
-    p.drawString(right_x + 0.15*inch, y_pos - 1.25*inch, 
-                 f"Fecha: {fecha_imagen_local.strftime('%d/%m/%Y')} | Hora: {fecha_imagen_local.strftime('%H:%M')}")
-    
-    y_pos -= 1.65*inch
-    
-    # Hallazgos
-    p.setFillColor(colors.white)
-    p.rect(right_x, y_pos - 1*inch, box_width, 1*inch, fill=1, stroke=0)
-    
-    p.setStrokeColor(gris_linea)
-    p.setLineWidth(0.5)
-    p.rect(right_x, y_pos - 1*inch, box_width, 1*inch, fill=0, stroke=1)
-    
-    p.setFillColor(azul_medio)
-    p.setFont("Helvetica-Bold", 9)
-    p.drawString(right_x + 0.15*inch, y_pos - 0.25*inch, "HALLAZGOS")
-    
-    p.setStrokeColor(azul_medio)
-    p.setLineWidth(1.5)
-    p.line(right_x + 0.15*inch, y_pos - 0.35*inch, right_x + 1.1*inch, y_pos - 0.35*inch)
-    
-    diagnostico_color = verde_clinico if item.grupo == "Sin Hernia" else rojo_clinico
-    
-    p.setFillColor(diagnostico_color)
-    p.circle(right_x + 0.25*inch, y_pos - 0.57*inch, 0.08*inch, fill=1, stroke=0)
-    
-    p.setFillColor(gris_texto)
-    p.setFont("Helvetica-Bold", 11)
-    p.drawString(right_x + 0.45*inch, y_pos - 0.62*inch, item.grupo.upper())
-    
-    p.setFont("Helvetica", 7)
-    p.setFillColor(HexColor('#64748b'))
-    p.drawString(right_x + 0.45*inch, y_pos - 0.78*inch, f"Confiabilidad del análisis: {item.porcentaje}%")
-    
-    y_pos -= 1.2*inch
-    
-    # Índice de confianza
-    p.setFillColor(fondo_claro)
-    p.rect(right_x, y_pos - 0.85*inch, box_width, 0.85*inch, fill=1, stroke=0)
-    
-    p.setStrokeColor(gris_linea)
-    p.setLineWidth(0.5)
-    p.rect(right_x, y_pos - 0.85*inch, box_width, 0.85*inch, fill=0, stroke=1)
-    
-    p.setFillColor(azul_medio)
-    p.setFont("Helvetica-Bold", 9)
-    p.drawString(right_x + 0.15*inch, y_pos - 0.25*inch, "ÍNDICE DE CONFIANZA")
-    
-    p.setStrokeColor(azul_medio)
-    p.setLineWidth(1.5)
-    p.line(right_x + 0.15*inch, y_pos - 0.35*inch, right_x + 1.6*inch, y_pos - 0.35*inch)
-    
-    bar_x = right_x + 0.15*inch
-    bar_y = y_pos - 0.55*inch
-    bar_width = box_width - 0.3*inch
-    bar_height = 0.12*inch
-    
-    p.setFillColor(HexColor('#e2e8f0'))
-    p.rect(bar_x, bar_y, bar_width, bar_height, fill=1, stroke=0)
-    
-    confidence_fill = bar_width * (float(item.porcentaje) / 100)
-    p.setFillColor(azul_medio)
-    p.rect(bar_x, bar_y, confidence_fill, bar_height, fill=1, stroke=0)
-    
-    p.setFillColor(azul_medio)
-    p.setFont("Helvetica-Bold", 16)
-    p.drawRightString(right_x + box_width - 0.15*inch, y_pos - 0.75*inch, f"{item.porcentaje}%")
-    
-    y_pos -= 1.05*inch
-    
-    # Interpretación radiológica
-    p.setFillColor(colors.white)
-    p.rect(right_x, y_pos - 2.6*inch, box_width, 2.6*inch, fill=1, stroke=0)
-    
-    p.setStrokeColor(gris_linea)
-    p.setLineWidth(0.5)
-    p.rect(right_x, y_pos - 2.6*inch, box_width, 2.6*inch, fill=0, stroke=1)
-    
-    p.setFillColor(azul_medio)
-    p.setFont("Helvetica-Bold", 9)
-    p.drawString(right_x + 0.15*inch, y_pos - 0.25*inch, "INTERPRETACIÓN RADIOLÓGICA")
-    
-    p.setStrokeColor(azul_medio)
-    p.setLineWidth(1.5)
-    p.line(right_x + 0.15*inch, y_pos - 0.35*inch, right_x + 2.1*inch, y_pos - 0.35*inch)
-    
-    p.setFillColor(gris_texto)
-    p.setFont("Helvetica", 7.5)
-    
-    text_y = y_pos - 0.55*inch
-    line_height = 0.14*inch
-    
-    if item.grupo == "Sin Hernia":
-        texto = [
-            "El análisis automatizado mediante inteligencia artificial",
-            "no identifica signos radiológicos compatibles con hernia",
-            "diafragmática en el estudio actual.",
-            "",
-            "La estructura diafragmática presenta morfología íntegra,",
-            "sin evidencia de soluciones de continuidad ni protrusión",
-            "de contenido abdominal hacia la cavidad torácica.",
-            "",
-            "RECOMENDACIONES:",
-            "• Correlación clínica según sintomatología",
-            "• Seguimiento imagenológico si persisten síntomas",
-            "• Valoración médica especializada"
-        ]
-    else:
-        texto = [
-            "El análisis automatizado identifica hallazgos radiológicos",
-            "compatibles con hernia diafragmática.",
-            "",
-            "Se observa posible alteración en la continuidad del",
-            "diafragma con protrusión de estructuras que sugieren",
-            "contenido abdominal hacia la cavidad torácica.",
-            "",
-            "RECOMENDACIONES PRIORITARIAS:",
-            "• Evaluación médica especializada urgente",
-            "• TC de tórax con contraste para caracterización",
-            "• Interconsulta con cirugía torácica",
-            "• Estudios complementarios según criterio clínico"
-        ]
-    
-    for linea in texto:
-        if linea.startswith("RECOMENDACIONES"):
-            p.setFont("Helvetica-Bold", 7.5)
-        elif linea.startswith("•"):
-            p.setFont("Helvetica", 7)
-        else:
-            p.setFont("Helvetica", 7.5)
+        generator = InformeRadiologicoGenerator()
+        pdf = generator.generate(historial)
         
-        p.drawString(right_x + 0.15*inch, text_y, linea)
-        text_y -= line_height
+        response = HttpResponse(pdf, content_type='application/pdf')
+        filename = f"informe_rad_{str(historial.id).zfill(6)}_{historial.paciente_nombre.replace(' ', '_')}.pdf"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        logger.info(f"PDF generado: {filename}")
+        return response
     
-    # Pie de página
-    p.setStrokeColor(gris_linea)
-    p.setLineWidth(0.5)
-    p.line(0.6*inch, 1*inch, width - 0.6*inch, 1*inch)
-    
-    p.setFillColor(HexColor('#64748b'))
-    p.setFont("Helvetica", 7)
-    p.drawString(0.6*inch, 0.75*inch, "NOTA IMPORTANTE:")
-    p.setFont("Helvetica", 6.5)
-    p.drawString(0.6*inch, 0.6*inch, 
-                 "Este informe ha sido generado mediante análisis automatizado con inteligencia artificial y debe ser validado por un médico radiólogo certificado.")
-    p.drawString(0.6*inch, 0.47*inch, 
-                 "Los resultados deben interpretarse en el contexto clínico del paciente. No sustituye el criterio médico profesional.")
-    
-    p.setFont("Helvetica", 6)
-    p.setFillColor(HexColor('#94a3b8'))
-    p.drawString(0.6*inch, 0.25*inch, f"Sistema de Análisis Radiológico Automatizado v2.0 | Informe ID: {str(item.id).zfill(6)} | Generado: {fecha_imagen_local.strftime('%d/%m/%Y %H:%M:%S')}")
-    
-    p.showPage()
-    p.save()
-    
-    pdf = buffer.getvalue()
-    buffer.close()
-    
-    response = HttpResponse(pdf, content_type='application/pdf')
-    response['Content-Disposition'] = f'attachment; filename="informe_rad_{str(item.id).zfill(6)}_{item.paciente_nombre.replace(" ", "_")}.pdf"'
-    return response
+    except Exception as e:
+        logger.error(f"Error generando PDF individual: {str(e)}")
+        messages.error(request, 'Error al generar el PDF.')
+        return redirect('historial_med')
 
 
+@login_required
+@require_http_methods(["GET"])
 def generar_pdf_general(request):
-    buffer = BytesIO()
-    p = canvas.Canvas(buffer, pagesize=letter)
-    width, height = letter
+    """
+    Genera un PDF con el historial general.
+    Muestra todos los registros si es superusuario, solo los propios si no.
+    """
+    try:
+        if request.user.is_superuser:
+            historiales = Historial.objects.all().order_by('-fecha_imagen')
+            filename = 'historial_radiologico_completo.pdf'
+        else:
+            historiales = Historial.objects.filter(user=request.user).order_by('-fecha_imagen')
+            filename = f'historial_rad_{request.user.username}.pdf'
+        
+        generator = HistorialGeneralGenerator()
+        pdf = generator.generate(historiales)
+        
+        response = HttpResponse(pdf, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        logger.info(f"PDF general generado: {filename}")
+        return response
     
-    if request.user.is_superuser:
-        historiales = Historial.objects.all().order_by('-fecha_imagen')
-    else:
-        historiales = Historial.objects.filter(user=request.user).order_by('-fecha_imagen')
-    
-    ecuador_tz = pytz.timezone('America/Guayaquil')
-    
-    azul_oscuro = HexColor('#1a2332')
-    gris_texto = HexColor('#2d3748')
-    gris_linea = HexColor('#cbd5e0')
-    
-    for index, item in enumerate(historiales):
-        if index > 0:
-            p.showPage()
-        
-        fecha_local = item.fecha_imagen.astimezone(ecuador_tz)
-        
-        p.setFillColor(azul_oscuro)
-        p.rect(0, height - 0.9*inch, width, 0.9*inch, fill=1, stroke=0)
-        
-        p.setFillColor(colors.white)
-        p.setFont("Helvetica-Bold", 16)
-        p.drawString(0.6*inch, height - 0.5*inch, "HISTORIAL RADIOLÓGICO")
-        p.setFont("Helvetica", 8)
-        p.drawRightString(width - 0.6*inch, height - 0.5*inch, f"Registro {index + 1} de {len(historiales)}")
-        
-        y_pos = height - 1.3*inch
-        
-        data = [
-            ["Paciente:", item.paciente_nombre, "ID:", str(item.id).zfill(6)],
-            ["Médico:", item.user.username, "Fecha:", fecha_local.strftime('%d/%m/%Y %H:%M')],
-            ["Diagnóstico:", item.grupo, "Confianza:", f"{item.porcentaje}%"],
-        ]
-        
-        table = Table(data, colWidths=[1*inch, 2.5*inch, 0.9*inch, 2.1*inch])
-        table.setStyle(TableStyle([
-            ('FONT', (0, 0), (0, -1), 'Helvetica-Bold', 8),
-            ('FONT', (2, 0), (2, -1), 'Helvetica-Bold', 8),
-            ('FONT', (1, 0), (1, -1), 'Helvetica', 8),
-            ('FONT', (3, 0), (3, -1), 'Helvetica', 8),
-            ('TEXTCOLOR', (0, 0), (-1, -1), gris_texto),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('LINEABOVE', (0, 0), (-1, 0), 0.5, gris_linea),
-            ('LINEBELOW', (0, -1), (-1, -1), 0.5, gris_linea),
-        ]))
-        
-        table.wrapOn(p, width, height)
-        table.drawOn(p, 0.6*inch, y_pos - 0.8*inch)
-        
-        y_pos -= 1.4*inch
-        
-        if item.imagen:
-            img_width = 3.5*inch
-            img_height = 5.5*inch
-            margin_left = (width - img_width) / 2
-            
-            p.setStrokeColor(gris_linea)
-            p.setLineWidth(1)
-            p.rect(margin_left, y_pos - img_height, img_width, img_height, stroke=1, fill=0)
-            
-            try:
-                image_url = item.imagen.url
-                response = requests.get(image_url)
-                
-                if response.status_code == 200 and response.content:
-                    image_data = BytesIO(response.content)
-                    img = Image.open(image_data).convert('RGB')
-                    
-                    with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as temp_file:
-                        img.save(temp_file, format='JPEG')
-                        temp_file_path = temp_file.name
-                    
-                    p.drawImage(temp_file_path, margin_left + 0.05*inch, y_pos - img_height + 0.05*inch, 
-                              width=img_width - 0.1*inch, height=img_height - 0.1*inch, 
-                              preserveAspectRatio=True, mask='auto')
-                    os.remove(temp_file_path)
-            except:
-                pass
-        
-        p.setFillColor(HexColor('#94a3b8'))
-        p.setFont("Helvetica", 7)
-        p.drawCentredString(width/2, 0.4*inch, f"Generado: {fecha_local.strftime('%d/%m/%Y %H:%M:%S')}")
-    
-    p.save()
-    
-    pdf = buffer.getvalue()
-    buffer.close()
-    
-    response = HttpResponse(pdf, content_type='application/pdf')
-    if request.user.is_superuser:
-        response['Content-Disposition'] = 'attachment; filename="historial_radiologico_completo.pdf"'
-    else:
-        response['Content-Disposition'] = f'attachment; filename="historial_rad_{request.user.username}.pdf"'
-    
-    return response
+    except Exception as e:
+        logger.error(f"Error generando PDF general: {str(e)}")
+        messages.error(request, 'Error al generar el PDF.')
+        return redirect('historial_med')
