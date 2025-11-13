@@ -30,25 +30,25 @@ Este proyecto es una aplicación web desarrollada con Django, diseñada para asi
 
 <p align="center">
 ```mermaid
-graph TD
-    subgraph "Usuario"
-        A[1. Carga de Imagen]
+flowchart TD
+    subgraph Usuario
+        A[1. Carga de Imagen] --> B
         H[8. Visualiza Resultado]
     end
 
     subgraph "Backend (Django)"
-        B[2. Valida y sube a S3]
-        E[5. Dibuja predicciones en imagen]
-        G[7. Guarda en Base de Datos]
+        B[2. Valida y sube a S3] --> C
+        E[5. Dibuja predicciones] --> F
+        E --> G[7. Guarda en BD]
     end
 
     subgraph "Servicios Externos"
-        C[3. Roboflow: Inferencia con IA]
-        D[4. Roboflow: Devuelve predicciones]
-        F[6. Amazon S3: Almacena imagen procesada]
+        C[3. Roboflow: Inferencia IA] --> D
+        D[4. Recibe predicciones] --> E
+        F[6. Almacena en S3] --> G
     end
 
-    A --> B --> C --> D --> E --> F & G --> H
+    G --> H
 ```
 </p>
 
