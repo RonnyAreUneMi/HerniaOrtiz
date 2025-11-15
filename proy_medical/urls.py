@@ -30,6 +30,8 @@ urlpatterns = [
     path('generar_pdf_fila/<int:id>/', views.generar_pdf_fila, name='generar_pdf_fila'),
     path('comparacion/', views.comparacion_view, name='comparacion'),
     path('modelos/retinanet/', views.modelo_retinanet_view, name='modelo_retinanet'),
+    path('modelos/yolov12/', views.modelo_yolov12_view, name='modelo_yolov12'),
+
     
     # URLs para el restablecimiento de contraseñas
     path('password_reset/', auth_views.PasswordResetView.as_view(

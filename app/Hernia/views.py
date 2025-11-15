@@ -547,3 +547,45 @@ def modelo_retinanet_view(request):
         'retinanet_data_json': retinanet_data_json
     })
 
+@login_required
+@require_http_methods(["GET"])
+def modelo_yolov12_view(request):
+    """
+    Vista para mostrar detalles específicos del modelo YOLOv12.
+    Muestra métricas detalladas, gráficos de entrenamiento y rendimiento.
+    """
+    import json
+    import os
+    from django.conf import settings
+    from django.contrib import messages
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    # Cargar datos del modelo YOLOv12
+    yolov12_data = None
+    data_dir = os.path.join(settings.BASE_DIR, 'app', 'Hernia', 'static', 'data')
+    yolov12_file = os.path.join(data_dir, 'Yolo_detect_3.json')
+
+    if os.path.exists(yolov12_file):
+        try:
+            with open(yolov12_file, 'r', encoding='utf-8') as f:
+                yolov12_data = json.load(f)
+        except Exception as e:
+            logger.error(f"Error cargando YOLOv12 data: {str(e)}")
+            messages.error(request, 'Error al cargar los datos del modelo YOLOv12.')
+    else:
+        messages.error(request, 'No se encontró el archivo de datos del modelo YOLOv12.')
+        return redirect('comparacion')
+
+    if not yolov12_data:
+        messages.error(request, 'No se encontraron datos del modelo YOLOv12.')
+        return redirect('comparacion')
+
+    # Serializar los datos como JSON para el template
+    yolov12_data_json = json.dumps(yolov12_data)
+
+    return render(request, 'dashboard/yolov12.html', {
+        'yolov12_data': yolov12_data,
+        'yolov12_data_json': yolov12_data_json
+    })

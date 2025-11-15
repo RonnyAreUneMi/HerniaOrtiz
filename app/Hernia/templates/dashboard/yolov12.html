@@ -1,0 +1,338 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}YOLOv12n - Marco Teórico{% endblock %}
+{% block content %}
+<style>
+/* Correcciones modo oscuro */
+body.dark .text-gray-600 { color: #9ca3af !important; }
+body.dark .text-gray-800 { color: #f3f4f6 !important; }
+body.dark .text-blue-900 { color: #60a5fa !important; }
+body.dark .text-red-900 { color: #fecaca !important; }
+body.dark .text-orange-900 { color: #fed7aa !important; }
+body.dark .text-green-900 { color: #bbf7d0 !important; }
+body.dark .bg-gradient-to-br .text-gray-700 { color: #000000 !important; }
+body.dark .bg-gray-50 .text-gray-700,
+body.dark .bg-slate-600 .text-black { color: #3b82f6 !important; }
+</style>
+<script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+<script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+<div class="max-w-7xl mx-auto space-y-8">
+   
+    <!-- Header Principal -->
+    <div class="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl shadow-xl p-8 text-white">
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-4xl font-bold mb-2">YOLOv12n</h1>
+                <p class="text-blue-100 text-lg">Marco Teórico y Optimización - hernia_detector_v3p3_5</p>
+            </div>
+            <div class="text-right">
+                <div class="text-white/80 text-sm mb-1">Configuración v3p3_5</div>
+                <div class="text-white font-bold text-3xl">Val Loss: 6.1630</div>
+                <div class="text-white/80 text-sm mt-1">Época 135/150</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Enlace al Entrenamiento -->
+    <div class="bg-gradient-to-r from-amber-50 to-orange-50 border-l-4 border-orange-500 rounded-lg p-6">
+        <div class="flex items-start space-x-4">
+            <div class="flex-shrink-0">
+                <svg class="w-8 h-8 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                </svg>
+            </div>
+            <div class="flex-1">
+                <h3 class="text-lg font-semibold text-gray-900 mb-2">Notebook de Entrenamiento</h3>
+                <p class="text-gray-700 mb-3">Código completo en Google Colab:</p>
+                <a href="https://colab.research.google.com/drive/1DjWt4bzPyGanPrDDeUbP0UO9XPr_M93W?usp=sharing"
+                   target="_blank"
+                   class="inline-flex items-center px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white font-medium rounded-lg transition-colors">
+                    <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                        <circle cx="7" cy="12" r="2" fill="#FF9800"/>
+                        <circle cx="12" cy="7" r="2" fill="#FFC107"/>
+                        <circle cx="17" cy="12" r="2" fill="#FF5722"/>
+                    </svg>
+                    Ver Notebook en Colab
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- 1. Arquitectura YOLOv12 (OFICIAL) -->
+    <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-gray-200 dark:border-slate-700 p-8 section-card">
+        <div class="flex items-center space-x-3 mb-6">
+            <div class="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center">
+                <svg class="w-7 h-7 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                </svg>
+            </div>
+            <h2 class="text-3xl font-bold text-gray-900 dark:text-white">1. Arquitectura del Modelo</h2>
+        </div>
+
+        <!-- Título principal -->
+        <div class="mb-6">
+            <div class="bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-500 dark:to-purple-500 rounded-xl p-6 border border-blue-200 dark:border-blue-700">
+                <div class="text-center text-2xl font-semibold text-white mb-2">
+                    YOLOv12 = A2 Attention + R-ELAN + YOLO Head
+                </div>
+                <div class="text-center text-yellow-300 font-medium">
+                    FlashAttention | MLP Ratio 1.2 | Sin Positional Encoding
+                </div>
+            </div>
+        </div>
+
+        <!-- Imagen del paper -->
+        <div class="mb-6">
+            <div class="bg-white dark:bg-slate-700 rounded-xl p-4 border border-gray-200 dark:border-slate-600">
+                <img src="https://arxiv.org/html/2411.00201v3/extracted/6233011/figs/YOLOv12_Architecture.drawio.png" alt="Arquitectura YOLOv12" class="w-full h-auto rounded-lg">
+                <div class="mt-3 text-xs text-gray-500 dark:text-gray-400 text-center">
+                    <strong>Fuente:</strong> 
+                    <a href="https://arxiv.org/html/2411.00201v3" target="_blank" class="text-blue-600 dark:text-blue-400 hover:underline">
+                        YOLOv12: Attention-Centric Real-Time Object Detection (arXiv 2411.00201v3)
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Componentes -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="bg-gradient-to-br from-blue-500 to-blue-600 dark:from-blue-400 dark:to-blue-500 rounded-xl p-6 border border-blue-200 dark:border-blue-600">
+                <div class="text-sm font-semibold text-blue-100 mb-2">BACKBONE</div>
+                <div class="text-2xl font-bold text-white mb-1">R-ELAN</div>
+                <div class="text-sm text-blue-100">Residual Efficient Layer Aggregation</div>
+                <div class="text-xs text-blue-200 mt-2">1 bloque final, estabilidad y convergencia</div>
+            </div>
+            <div class="bg-gradient-to-br from-purple-500 to-purple-600 dark:from-purple-400 dark:to-purple-500 rounded-xl p-6 border border-purple-200 dark:border-purple-600">
+                <div class="text-sm font-semibold text-purple-100 mb-2">NECK</div>
+                <div class="text-2xl font-bold text-white mb-1">A2 Attention</div>
+                <div class="text-sm text-purple-100">Area Attention Module</div>
+                <div class="text-xs text-purple-200 mt-2">Campo receptivo amplio, baja complejidad</div>
+            </div>
+            <div class="bg-gradient-to-br from-indigo-500 to-indigo-600 dark:from-indigo-400 dark:to-indigo-500 rounded-xl p-6 border border-indigo-200 dark:border-indigo-600">
+                <div class="text-sm font-semibold text-indigo-100 mb-2">HEAD</div>
+                <div class="text-2xl font-bold text-white mb-1">YOLO Head</div>
+                <div class="text-sm text-indigo-100">Box=10.0, Cls=1.5, DFL=1.5</div>
+                <div class="text-xs text-indigo-200 mt-2">Conv + BN, sin lineales</div>
+            </div>
+        </div>
+
+        <!-- Innovaciones clave -->
+        <div class="mt-8 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/30 dark:to-purple-900/30 rounded-xl p-6 border border-indigo-200 dark:border-indigo-700">
+            <h3 class="text-lg font-bold text-indigo-900 dark:text-indigo-100 mb-3">Innovaciones Clave de YOLOv12</h3>
+            <ul class="space-y-2 text-sm text-indigo-800 dark:text-indigo-200">
+                <li class="flex items-start">
+                    <span class="text-indigo-600 dark:text-indigo-400 mr-2">•</span>
+                    <strong>FlashAttention</strong>: Reduce sobrecarga de memoria
+                </li>
+                <li class="flex items-start">
+                    <span class="text-indigo-600 dark:text-indigo-400 mr-2">•</span>
+                    <strong>MLP Ratio 1.2</strong>: Eficiencia en inferencia
+                </li>
+                <li class="flex items-start">
+                    <span class="text-indigo-600 dark:text-indigo-400 mr-2">•</span>
+                    <strong>Sin positional encoding</strong>: Modelo más limpio
+                </li>
+                <li class="flex items-start">
+                    <span class="text-indigo-600 dark:text-indigo-400 mr-2">•</span>
+                    <strong>1 solo R-ELAN en etapa final</strong>: Menos complejidad
+                </li>
+                <li class="flex items-start">
+                    <span class="text-indigo-600 dark:text-indigo-400 mr-2">•</span>
+                    <strong>Conv + BN en lugar de lineales</strong>: Máxima eficiencia
+                </li>
+            </ul>
+        </div>
+    </div>
+
+
+    <!-- 3. Configuración de Entrenamiento (REAL) -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-200 p-8 section-card">
+        <div class="flex items-center space-x-3 mb-6">
+            <div class="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
+                <svg class="w-7 h-7 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
+                </svg>
+            </div>
+            <h2 class="text-3xl font-bold text-gray-900">2. Configuración de Entrenamiento</h2>
+        </div>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-5 border border-blue-200 text-center">
+                <div class="text-xs font-semibold text-blue-100 mb-2">TAMAÑO IMAGEN</div>
+                <div class="text-3xl font-bold text-white">640×640</div>
+            </div>
+            <div class="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-5 border border-purple-200 text-center">
+                <div class="text-xs font-semibold text-purple-100 mb-2">BATCH SIZE</div>
+                <div class="text-3xl font-bold text-white">16</div>
+            </div>
+            <div class="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-5 border border-green-200 text-center">
+                <div class="text-xs font-semibold text-green-100 mb-2">ÉPOCAS</div>
+                <div class="text-3xl font-bold text-white">135 / 150</div>
+            </div>
+            <div class="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl p-5 border border-yellow-200 text-center">
+                <div class="text-xs font-semibold text-yellow-100 mb-2">LR INICIAL</div>
+                <div class="text-3xl font-bold text-white">0.001</div>
+            </div>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead>
+                    <tr class="bg-gray-100 dark:bg-slate-700 border-b-2 border-gray-300 dark:border-slate-600">
+                        <th class="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-200">Parámetro</th>
+                        <th class="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-200">Valor</th>
+                        <th class="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-200">Descripción</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-slate-600">
+                    <tr class="hover:bg-gray-50 dark:hover:bg-slate-700">
+                        <td class="py-3 px-4 font-medium text-gray-900 dark:text-gray-100">lr0</td>
+                        <td class="py-3 px-4 font-mono text-gray-700 dark:text-gray-300">0.001</td>
+                        <td class="py-3 px-4 text-sm text-gray-600 dark:text-gray-400">Tasa de aprendizaje inicial</td>
+                    </tr>
+                    <tr class="hover:bg-gray-50">
+                        <td class="py-3 px-4 font-medium text-gray-900">weight_decay</td>
+                        <td class="py-3 px-4 font-mono text-gray-700">0.0003</td>
+                        <td class="py-3 px-4 text-sm text-gray-600">Regularización L2</td>
+                    </tr>
+                    <tr class="hover:bg-gray-50">
+                        <td class="py-3 px-4 font-medium text-gray-900">dropout</td>
+                        <td class="py-3 px-4 font-mono text-gray-700">0.15</td>
+                        <td class="py-3 px-4 text-sm text-gray-600">Prevención de overfitting</td>
+                    </tr>
+                    <tr class="hover:bg-gray-50">
+                        <td class="py-3 px-4 font-medium text-gray-900">imgsz</td>
+                        <td class="py-3 px-4 font-mono text-gray-700">640</td>
+                        <td class="py-3 px-4 text-sm text-gray-600">Tamaño de entrada</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 4. Técnicas de Data Augmentation (REALES) -->
+    <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-gray-200 dark:border-slate-700 p-8 section-card">
+        <div class="flex items-center space-x-3 mb-6">
+            <div class="w-12 h-12 bg-gradient-to-br from-teal-500 to-cyan-600 rounded-xl flex items-center justify-center">
+                <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                </svg>
+            </div>
+            <h2 class="text-3xl font-bold text-gray-900 dark:text-white">3. Técnicas de Data Augmentation</h2>
+        </div>
+        <p class="text-gray-700 dark:text-gray-300 mb-6">
+            <strong>Augmentations agresivas</strong> aplicadas en cada batch para combatir el sobreajuste.
+        </p>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="bg-gradient-to-br from-teal-50 to-cyan-50 dark:from-teal-900/20 dark:to-cyan-900/20 rounded-xl p-5 border border-teal-200 dark:border-teal-700">
+                <div class="font-mono text-sm text-teal-900 dark:text-teal-300">hsv_h=0.015, hsv_s=0.7, hsv_v=0.4</div>
+                <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Variación de color (HSV)</div>
+            </div>
+            <div class="bg-gradient-to-br from-teal-50 to-cyan-50 dark:from-teal-900/20 dark:to-cyan-900/20 rounded-xl p-5 border border-teal-200 dark:border-teal-700">
+                <div class="font-mono text-sm text-teal-900 dark:text-teal-300">degrees=15, translate=0.2, scale=0.5</div>
+                <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Rotación, traslación y escala</div>
+            </div>
+            <div class="bg-gradient-to-br from-teal-50 to-cyan-50 dark:from-teal-900/20 dark:to-cyan-900/20 rounded-xl p-5 border border-teal-200 dark:border-teal-700">
+                <div class="font-mono text-sm text-teal-900 dark:text-teal-300">flipud=0.5, fliplr=0.5</div>
+                <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Volteo vertical y horizontal</div>
+            </div>
+            <div class="bg-gradient-to-br from-teal-50 to-cyan-50 dark:from-teal-900/20 dark:to-cyan-900/20 rounded-xl p-5 border border-teal-200 dark:border-teal-700">
+                <div class="font-mono text-sm text-teal-900 dark:text-teal-300">mosaic=1.0, mixup=0.1, copy_paste=0.1</div>
+                <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Mosaico, MixUp y Copy-Paste</div>
+            </div>
+        </div>
+    </div>
+
+        <!-- 5. Resultados de Rendimiento -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-200 p-8 section-card">
+        <div class="flex items-center space-x-3 mb-6">
+            <div class="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
+                <svg class="w-7 h-7 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+            </div>
+            <h2 class="text-3xl font-bold text-gray-900">4. Métricas de Rendimiento (Época 135)</h2>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-5 border border-blue-200 text-center">
+                <div class="text-xs font-semibold text-blue-100 mb-2">PRECISIÓN</div>
+                <div class="text-3xl font-bold text-white">74.66%</div>
+            </div>
+            <div class="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-5 border border-green-200 text-center">
+                <div class="text-xs font-semibold text-green-100 mb-2">RECALL</div>
+                <div class="text-3xl font-bold text-white">64.87%</div>
+            </div>
+            <div class="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-5 border border-purple-200 text-center">
+                <div class="text-xs font-semibold text-purple-100 mb-2">mAP@0.5</div>
+                <div class="text-3xl font-bold text-white">74.62%</div>
+            </div>
+            <div class="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl p-5 border border-yellow-200 text-center">
+                <div class="text-xs font-semibold text-yellow-100 mb-2">mAP@0.5:0.95</div>
+                <div class="text-3xl font-bold text-white">54.19%</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 6. Evolución del Loss Durante Entrenamiento -->
+<div class="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl shadow-2xl p-8 text-white section-card border border-slate-700">
+    <div class="flex items-center space-x-3 mb-8">
+        <div class="w-12 h-12 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl flex items-center justify-center">
+            <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+            </svg>
+        </div>
+        <h2 class="text-3xl font-bold">5. Evolución del Loss Durante Entrenamiento</h2>
+    </div>
+
+    <!-- Train & Val Loss Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <!-- Train Loss -->
+        <div class="bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl p-6 border border-blue-500 shadow-lg">
+            <h3 class="text-xl font-bold mb-4 text-blue-100">Train Loss</h3>
+            <div class="space-y-3 text-sm">
+                <div class="flex justify-between"><span class="text-blue-200">Época 1 (inicial):</span> <span class="font-mono font-bold">19.0031</span></div>
+                <div class="flex justify-between text-yellow-300"><span>Época 135 (mejor):</span> <span class="font-mono font-bold">4.7593</span></div>
+                <div class="flex justify-between"><span class="text-blue-200">Época 150 (final):</span> <span class="font-mono font-bold">4.7593</span></div>
+                <div class="border-t border-blue-400 pt-3 mt-3">
+                    <div class="flex justify-between text-green-300 text-lg font-bold">
+                        <span>Mejora total:</span> <span>74.96%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Validation Loss -->
+        <div class="bg-gradient-to-br from-purple-600 to-purple-700 rounded-2xl p-6 border border-purple-500 shadow-lg">
+            <h3 class="text-xl font-bold mb-4 text-purple-100">Validation Loss</h3>
+            <div class="space-y-3 text-sm">
+                <div class="flex justify-between"><span class="text-purple-200">Época 1 (inicial):</span> <span class="font-mono font-bold">16.4079</span></div>
+                <div class="flex justify-between text-yellow-300"><span>Época 135 (mejor):</span> <span class="font-mono font-bold">6.1630</span></div>
+                <div class="flex justify-between"><span class="text-purple-200">Época 150 (final):</span> <span class="font-mono font-bold">6.1630</span></div>
+                <div class="border-t border-purple-400 pt-3 mt-3">
+                    <div class="flex justify-between text-green-300 text-lg font-bold">
+                        <span>Mejora total:</span> <span>62.45%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="text-center text-gray-500 dark:text-gray-400 text-sm py-4">
+        <p>Modelo entrenado: 2025-11-13 03:38:15</p>
+        <p class="mt-1">YOLOv12n - hernia_detector_v3p3_5 - 9 clases</p>
+        <p class="mt-1">Paper: <a href="https://arxiv.org/abs/2411.00201" class="text-blue-600 hover:underline">arXiv:2411.00201</a></p>
+    </div>
+</div>
+
+<script>
+window.MathJax = { 
+    tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']] }, 
+    options: { skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre'] }, 
+    startup: { ready: () => { MathJax.startup.defaultReady(); } } 
+};
+document.addEventListener('DOMContentLoaded', () => { 
+    if (window.MathJax?.typesetPromise) MathJax.typesetPromise(); 
+});
+</script>
+{% endblock %}
