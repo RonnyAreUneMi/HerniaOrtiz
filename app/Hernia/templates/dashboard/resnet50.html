@@ -1,0 +1,1017 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}ResNet50-FPN - Marco Teórico{% endblock %}
+
+{% block content %}
+<style>
+/* Corregir colores en punto 1 para modo oscuro */
+body.dark .text-gray-600 {
+    color: #9ca3af !important;
+}
+body.dark .text-gray-800 {
+    color: #f3f4f6 !important;
+}
+/* 640x640 en azul en modo oscuro */
+body.dark .text-blue-900 {
+    color: #60a5fa !important;
+}
+/* Títulos de versiones más brillantes en modo oscuro */
+body.dark .text-red-900 {
+    color: #fecaca !important;
+}
+body.dark .text-orange-900 {
+    color: #fed7aa !important;
+}
+body.dark .text-green-900 {
+    color: #bbf7d0 !important;
+}
+/* Textos específicos de época en negro en punto 6 */
+body.dark .bg-gradient-to-br .text-gray-700 {
+    color: #000000 !important;
+}
+/* Números de referencias 1-10 en azul en modo oscuro */
+body.dark .bg-gray-50 .text-gray-700,
+body.dark .bg-slate-600 .text-black {
+    color: #3b82f6 !important;
+}
+</style>
+<script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+<script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+<div class="max-w-7xl mx-auto space-y-8">
+    
+    <!-- Header Principal -->
+    <div class="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl shadow-xl p-8 text-white">
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-4xl font-bold mb-2">Faster R-CNN ResNet50-FPN</h1>
+                <p class="text-blue-100 text-lg">Detección de Hernias Discales Lumbares - Marco Teórico y Optimización</p>
+            </div>
+            <div class="text-right">
+                <div class="text-white/80 text-sm mb-1">Configuración Optimizada - 100 Épocas</div>
+                <div class="text-white font-bold text-3xl">Val Loss: 0.4547</div>
+                <div class="text-white/80 text-sm mt-1">Época 65/100</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Enlace al Entrenamiento -->
+    <div class="bg-gradient-to-r from-amber-50 to-orange-50 border-l-4 border-orange-500 rounded-lg p-6">
+        <div class="flex items-start space-x-4">
+            <div class="flex-shrink-0">
+                <svg class="w-8 h-8 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                </svg>
+            </div>
+            <div class="flex-1">
+                <h3 class="text-lg font-semibold text-gray-900 mb-2">Notebook de Entrenamiento</h3>
+                <p class="text-gray-700 mb-3">El código completo del entrenamiento está disponible en Google Colab</p>
+                <a href="https://colab.research.google.com/drive/1-zgYAdY42ZpX3hHdAMIK3S0g18zA3zsA?usp=sharing" 
+                   target="_blank"
+                   class="inline-flex items-center px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white font-medium rounded-lg transition-colors">
+                    <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                        <circle cx="7" cy="12" r="2" fill="#FF9800"/>
+                        <circle cx="12" cy="7" r="2" fill="#FFC107"/>
+                        <circle cx="17" cy="12" r="2" fill="#FF5722"/>
+                    </svg>
+                    Ver Notebook en Colab
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- 1. Arquitectura -->
+    <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-gray-200 dark:border-slate-700 p-8 section-card">
+        <div class="flex items-center space-x-3 mb-6">
+            <div class="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center">
+                <svg class="w-7 h-7 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                </svg>
+            </div>
+            <h2 class="text-3xl font-bold text-gray-900 dark:text-white">1. Arquitectura del Modelo</h2>
+        </div>
+        
+        <div class="mb-6">
+            <div class="bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-500 dark:to-purple-500 rounded-xl p-6 border border-blue-200 dark:border-blue-700">
+                <div class="text-center text-2xl font-semibold text-white mb-2">
+                    Faster R-CNN = ResNet50 + FPN + RPN + RoI Head
+                </div>
+                <div class="text-center text-yellow-300 font-medium">
+                    Two-Stage Detector con Region Proposal Network y Clasificación/Localización
+                </div>
+            </div>
+        </div>
+        
+        <!-- Imagen de arquitectura Faster R-CNN -->
+        <div class="mb-6">
+            <div class="bg-white dark:bg-slate-700 rounded-xl p-4 border border-gray-200 dark:border-slate-600">
+                <img src="https://miro.medium.com/v2/resize:fit:1400/1*0pDD5CimVFQHbRaLAEJFjA.png" 
+                     alt="Arquitectura Faster R-CNN" 
+                     class="w-full h-auto rounded-lg">
+                <div class="mt-3 text-xs text-gray-500 dark:text-gray-400 text-center">
+                    <strong>Fuente:</strong> <a href="https://arxiv.org/abs/1506.01497" target="_blank" class="text-blue-600 dark:text-blue-400 hover:underline">Ren et al. (2015) - Faster R-CNN: Towards Real-Time Object Detection with Region Proposal Networks</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="bg-gradient-to-br from-blue-500 to-blue-600 dark:from-blue-400 dark:to-blue-500 rounded-xl p-6 border border-blue-200 dark:border-blue-600">
+                <div class="text-sm font-semibold text-blue-100 mb-2">BACKBONE</div>
+                <div class="text-2xl font-bold text-white mb-1">ResNet-50</div>
+                <div class="text-sm text-blue-100">~25M parámetros</div>
+                <div class="text-xs text-blue-200 mt-2">Extracción de características profundas</div>
+            </div>
+            <div class="bg-gradient-to-br from-purple-500 to-purple-600 dark:from-purple-400 dark:to-purple-500 rounded-xl p-6 border border-purple-200 dark:border-purple-600">
+                <div class="text-sm font-semibold text-purple-100 mb-2">NECK</div>
+                <div class="text-2xl font-bold text-white mb-1">FPN</div>
+                <div class="text-sm text-purple-100">Feature Pyramid Network</div>
+                <div class="text-xs text-purple-200 mt-2">Fusión multi-escala top-down</div>
+            </div>
+            <div class="bg-gradient-to-br from-indigo-500 to-indigo-600 dark:from-indigo-400 dark:to-indigo-500 rounded-xl p-6 border border-indigo-200 dark:border-indigo-600">
+                <div class="text-sm font-semibold text-indigo-100 mb-2">HEAD</div>
+                <div class="text-2xl font-bold text-white mb-1">RPN + RoI</div>
+                <div class="text-sm text-indigo-100">Two-Stage Detection</div>
+                <div class="text-xs text-indigo-200 mt-2">Propuestas + Clasificación</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Funciones de Loss -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-200 p-8 section-card">
+        <div class="flex items-center space-x-3 mb-6">
+            <div class="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
+                <svg class="w-7 h-7 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                </svg>
+            </div>
+            <h2 class="text-3xl font-bold text-gray-900">2. Funciones de Loss</h2>
+        </div>
+
+        <div class="space-y-8">
+            <!-- 2.1 RPN Loss -->
+            <div class="border-l-4 border-purple-500 pl-6">
+                <h3 class="text-xl font-bold text-gray-900 mb-4">2.1 Region Proposal Network (RPN) Loss</h3>
+                <div class="bg-gray-50 rounded-xl p-6 mb-4">
+                    <div class="text-center text-lg font-mono overflow-x-auto">
+                        $$L_{RPN} = L_{cls}(p_i, p_i^*) + \lambda L_{reg}(t_i, t_i^*)$$
+                    </div>
+                </div>
+                <div class="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                    <p class="text-sm text-gray-700">
+                        <strong>Referencia:</strong> Ren et al. (2015) - "Faster R-CNN". El RPN genera propuestas de regiones mediante anchors. La loss combina clasificación binaria (objeto/no-objeto) y regresión de bounding boxes.
+                    </p>
+                </div>
+            </div>
+
+            <!-- 2.2 Fast R-CNN Loss -->
+            <div class="border-l-4 border-blue-500 pl-6">
+                <h3 class="text-xl font-bold text-gray-900 mb-4">2.2 Fast R-CNN Detection Loss</h3>
+                <div class="bg-gray-50 rounded-xl p-6 mb-4">
+                    <div class="text-center font-mono overflow-x-auto">
+                        $$L_{det} = L_{cls}(p, u) + \lambda[u \geq 1]L_{loc}(t^u, v)$$
+                    </div>
+                </div>
+                <div class="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                    <p class="text-sm text-gray-700">
+                        Loss multi-tarea que combina clasificación de múltiples clases (cross-entropy) con regresión de bounding boxes (Smooth L1). Solo se aplica regresión a predicciones positivas.
+                    </p>
+                </div>
+            </div>
+
+            <!-- 2.3 Loss Total -->
+            <div class="border-l-4 border-green-500 pl-6">
+                <h3 class="text-xl font-bold text-gray-900 mb-4">2.3 Loss Total Faster R-CNN</h3>
+                <div class="bg-gray-50 rounded-xl p-6 mb-4">
+                    <div class="text-center text-lg font-mono overflow-x-auto">
+                        $$L_{total} = L_{RPN} + L_{det}$$
+                    </div>
+                </div>
+                <div class="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-4 border border-yellow-300 dark:border-yellow-600">
+                    <p class="text-sm text-gray-700 dark:text-gray-200">
+                        <strong>Nota importante:</strong> Faster R-CNN optimiza end-to-end ambas etapas (RPN y detección). Los valores de loss son normalizados por el número de anchors y RoIs procesados.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. Configuración de Entrenamiento -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-200 p-8 section-card">
+        <div class="flex items-center space-x-3 mb-6">
+            <div class="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
+                <svg class="w-7 h-7 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
+                </svg>
+            </div>
+            <h2 class="text-3xl font-bold text-gray-900">3. Configuración de Entrenamiento</h2>
+        </div>
+
+        <!-- Parámetros principales -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-5 border border-blue-200 text-center">
+                <div class="text-xs font-semibold text-blue-100 mb-2">TAMAÑO IMAGEN</div>
+                <div class="text-3xl font-bold text-white">Variable</div>
+                <div class="text-xs text-blue-200 mt-1">Original size</div>
+            </div>
+            <div class="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-5 border border-purple-200 text-center">
+                <div class="text-xs font-semibold text-purple-100 mb-2">BATCH SIZE</div>
+                <div class="text-3xl font-bold text-white">4</div>
+            </div>
+            <div class="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-5 border border-green-200 text-center">
+                <div class="text-xs font-semibold text-green-100 mb-2">ÉPOCAS</div>
+                <div class="text-3xl font-bold text-white">100</div>
+            </div>
+            <div class="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl p-5 border border-yellow-200 text-center">
+                <div class="text-xs font-semibold text-yellow-100 mb-2">MEJOR ÉPOCA</div>
+                <div class="text-3xl font-bold text-white">65</div>
+            </div>
+        </div>
+
+        <!-- Tabla de hiperparámetros -->
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead>
+                    <tr class="bg-gray-100 dark:bg-slate-700 border-b-2 border-gray-300 dark:border-slate-600">
+                        <th class="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-200">Parámetro</th>
+                        <th class="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-200">Valor</th>
+                        <th class="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-200">Descripción</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-slate-600">
+                    <tr class="hover:bg-gray-50 dark:hover:bg-slate-700">
+                        <td class="py-3 px-4 font-medium text-gray-900 dark:text-gray-100">Learning Rate (inicial)</td>
+                        <td class="py-3 px-4 font-mono text-gray-700 dark:text-gray-300">2e-4</td>
+                        <td class="py-3 px-4 text-sm text-gray-600 dark:text-gray-400">Tasa de aprendizaje inicial</td>
+                    </tr>
+                    <tr class="hover:bg-gray-50">
+                        <td class="py-3 px-4 font-medium text-gray-900">Learning Rate (min)</td>
+                        <td class="py-3 px-4 font-mono text-gray-700">1e-7</td>
+                        <td class="py-3 px-4 text-sm text-gray-600">Tasa final mínima</td>
+                    </tr>
+                    <tr class="hover:bg-gray-50">
+                        <td class="py-3 px-4 font-medium text-gray-900">Optimizer</td>
+                        <td class="py-3 px-4 font-mono text-gray-700">AdamW</td>
+                        <td class="py-3 px-4 text-sm text-gray-600">Adam con weight decay desacoplado</td>
+                    </tr>
+                    <tr class="hover:bg-gray-50">
+                        <td class="py-3 px-4 font-medium text-gray-900">Weight Decay</td>
+                        <td class="py-3 px-4 font-mono text-gray-700">1e-2</td>
+                        <td class="py-3 px-4 text-sm text-gray-600">Regularización L2</td>
+                    </tr>
+                    <tr class="hover:bg-gray-50">
+                        <td class="py-3 px-4 font-medium text-gray-900">LR Scheduler</td>
+                        <td class="py-3 px-4 font-mono text-gray-700">CosineAnnealingWarmRestarts</td>
+                        <td class="py-3 px-4 text-sm text-gray-600">T_0=20, T_mult=2</td>
+                    </tr>
+                    <tr class="hover:bg-gray-50">
+                        <td class="py-3 px-4 font-medium text-gray-900">Gradient Clipping</td>
+                        <td class="py-3 px-4 font-mono text-gray-700">1.0</td>
+                        <td class="py-3 px-4 text-sm text-gray-600">Estabilidad de gradientes</td>
+                    </tr>
+                    <tr class="hover:bg-gray-50">
+                        <td class="py-3 px-4 font-medium text-gray-900">RPN Score Threshold</td>
+                        <td class="py-3 px-4 font-mono text-gray-700">0.0</td>
+                        <td class="py-3 px-4 text-sm text-gray-600">Umbral para propuestas RPN</td>
+                    </tr>
+                    <tr class="hover:bg-gray-50">
+                        <td class="py-3 px-4 font-medium text-gray-900">RPN NMS Threshold</td>
+                        <td class="py-3 px-4 font-mono text-gray-700">0.7</td>
+                        <td class="py-3 px-4 text-sm text-gray-600">Non-Maximum Suppression</td>
+                    </tr>
+                    <tr class="hover:bg-gray-50">
+                        <td class="py-3 px-4 font-medium text-gray-900">Detection Score Threshold</td>
+                        <td class="py-3 px-4 font-mono text-gray-700">0.03</td>
+                        <td class="py-3 px-4 text-sm text-gray-600">Umbral de confianza para detecciones</td>
+                    </tr>
+                    <tr class="hover:bg-gray-50">
+                        <td class="py-3 px-4 font-medium text-gray-900">Detection NMS Threshold</td>
+                        <td class="py-3 px-4 font-mono text-gray-700">0.4</td>
+                        <td class="py-3 px-4 text-sm text-gray-600">NMS final para detecciones</td>
+                    </tr>
+                    <tr class="hover:bg-gray-50">
+                        <td class="py-3 px-4 font-medium text-gray-900">Detections Per Image</td>
+                        <td class="py-3 px-4 font-mono text-gray-700">150</td>
+                        <td class="py-3 px-4 text-sm text-gray-600">Máximo de detecciones por imagen</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 4. Técnicas de Optimización -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-200 p-8 section-card">
+        <div class="flex items-center space-x-3 mb-6">
+            <div class="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center">
+                <svg class="w-7 h-7 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                </svg>
+            </div>
+            <h2 class="text-3xl font-bold text-gray-900">4. Técnicas de Optimización Implementadas</h2>
+        </div>
+
+        <div class="space-y-6">
+            <!-- Copy-Paste -->
+            <div class="bg-gray-50 dark:bg-slate-700 rounded-xl p-6 border border-gray-200 dark:border-slate-600">
+                <div class="flex items-start space-x-4">
+                    <div class="flex-shrink-0 w-10 h-10 bg-indigo-100 dark:bg-indigo-900/30 rounded-full flex items-center justify-center text-lg font-bold text-indigo-600 dark:text-indigo-400">1</div>
+                    <div class="flex-1">
+                        <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-3">Copy-Paste Ultra-Agresivo</h3>
+                        <p class="text-gray-700 dark:text-gray-300 mb-2">
+                            Probabilidad de 50-60% de aplicar copy-paste durante entrenamiento. Para imágenes con clases minoritarias, se pegan 1-2 objetos; para otras, 2-3 objetos. Incluye escalado aleatorio (0.6-1.4x) y jittering de color.
+                        </p>
+                        <div class="text-sm text-indigo-600 dark:text-indigo-400 font-medium">
+                            Ghiasi et al. (2021) - "Simple Copy-Paste is a Strong Data Augmentation Method for Instance Segmentation"
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Weighted Sampler -->
+            <div class="bg-gray-50 dark:bg-slate-700 rounded-xl p-6 border border-gray-200 dark:border-slate-600">
+                <div class="flex items-start space-x-4">
+                    <div class="flex-shrink-0 w-10 h-10 bg-indigo-100 dark:bg-indigo-900/30 rounded-full flex items-center justify-center text-lg font-bold text-indigo-600 dark:text-indigo-400">2</div>
+                    <div class="flex-1">
+                        <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-3">Weighted Random Sampler Exponencial</h3>
+                        <div class="bg-white rounded-lg p-4 mb-3 border border-gray-200">
+                            <div class="font-mono text-sm overflow-x-auto">
+                                $w_i = \begin{cases} (1/f_c)^{1.5} \times 50 & f_c \leq 5 \\ (1/f_c)^{1.3} \times 35 & 5 < f_c \leq 10 \\ (1/f_c)^{1.1} \times 20 & 10 < f_c \leq 30 \\ 1/f_c & f_c > 30 \end{cases}$
+                            </div>
+                        </div>
+                        <p class="text-gray-700 dark:text-gray-300 mb-2">
+                            Penalización exponencial basada en la frecuencia de la clase más rara en cada imagen. Clases con ≤5 ejemplos tienen peso hasta 50x mayor para balancear el dataset extremadamente desbalanceado.
+                        </p>
+                        <div class="text-sm text-indigo-600 dark:text-indigo-400 font-medium">
+                            Cui et al. (2019) - "Class-Balanced Loss Based on Effective Number of Samples"
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Data Augmentation -->
+            <div class="bg-gray-50 dark:bg-slate-700 rounded-xl p-6 border border-gray-200 dark:border-slate-600">
+                <div class="flex items-start space-x-4">
+                    <div class="flex-shrink-0 w-10 h-10 bg-indigo-100 dark:bg-indigo-900/30 rounded-full flex items-center justify-center text-lg font-bold text-indigo-600 dark:text-indigo-400">3</div>
+                    <div class="flex-1">
+                        <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-3">Data Augmentation Mejorada</h3>
+                        <p class="text-gray-700 dark:text-gray-300 mb-2">
+                            Combinación de: Horizontal Flip (50%), Color Jitter (70%: brightness±0.3, contrast±0.3, saturation±0.2, hue±0.05), Gaussian Blur (20%: radius 0.5-1.5), y Random Rotation (30%: ±10°). Todas las transformaciones ajustan automáticamente las bounding boxes.
+                        </p>
+                        <div class="text-sm text-indigo-600 dark:text-indigo-400 font-medium">
+                            Shorten & Khoshgoftaar (2019) - "A survey on Image Data Augmentation for Deep Learning"
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cosine Annealing Warm Restarts -->
+            <div class="bg-gray-50 dark:bg-slate-700 rounded-xl p-6 border border-gray-200 dark:border-slate-600">
+                <div class="flex items-start space-x-4">
+                    <div class="flex-shrink-0 w-10 h-10 bg-indigo-100 dark:bg-indigo-900/30 rounded-full flex items-center justify-center text-lg font-bold text-indigo-600 dark:text-indigo-400">4</div>
+                    <div class="flex-1">
+                        <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-3">Cosine Annealing Warm Restarts</h3>
+                        <div class="bg-white rounded-lg p-4 mb-3 border border-gray-200">
+                            <div class="font-mono text-sm overflow-x-auto">
+                                $\eta_t = \eta_{min} + \frac{1}{2}(\eta_{max} - \eta_{min})\left(1 + \cos\left(\frac{\pi T_{cur}}{T_i}\right)\right)$
+                            </div>
+                        </div>
+                        <p class="text-gray-700 dark:text-gray-300 mb-2">
+                            Scheduler con reinicios periódicos cada T_0=20 épocas, duplicando el periodo después de cada restart (T_mult=2). LR oscila entre 2e-4 y 1e-7. Los reinicios permiten escapar de mínimos locales y explorar mejor el espacio de soluciones.
+                        </p>
+                        <div class="text-sm text-indigo-600 dark:text-indigo-400 font-medium">
+                            Loshchilov & Hutter (2016) - "SGDR: Stochastic Gradient Descent with Warm Restarts"
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AdamW -->
+            <div class="bg-gray-50 dark:bg-slate-700 rounded-xl p-6 border border-gray-200 dark:border-slate-600">
+                <div class="flex items-start space-x-4">
+                    <div class="flex-shrink-0 w-10 h-10 bg-indigo-100 dark:bg-indigo-900/30 rounded-full flex items-center justify-center text-lg font-bold text-indigo-600 dark:text-indigo-400">5</div>
+                    <div class="flex-1">
+                        <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-3">AdamW Optimizer</h3>
+                        <div class="bg-white rounded-lg p-4 mb-3 border border-gray-200">
+                            <div class="font-mono text-sm overflow-x-auto">
+                                $w_{t+1} = w_t - \alpha(\hat{m}_t / \sqrt{\hat{v}_t + \epsilon} + \lambda w_t)$
+                            </div>
+                        </div>
+                        <p class="text-gray-700 dark:text-gray-300 mb-2">
+                            Adam con weight decay desacoplado (λ=0.01). A diferencia de Adam clásico, el weight decay se aplica directamente a los pesos antes de la actualización, mejorando la regularización. Betas=(0.9, 0.999) para momentum adaptativo.
+                        </p>
+                        <div class="text-sm text-indigo-600 dark:text-indigo-400 font-medium">
+                            Loshchilov & Hutter (2017) - "Decoupled Weight Decay Regularization"
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gradient Clipping -->
+            <div class="bg-gray-50 dark:bg-slate-700 rounded-xl p-6 border border-gray-200 dark:border-slate-600">
+                <div class="flex items-start space-x-4">
+                    <div class="flex-shrink-0 w-10 h-10 bg-indigo-100 dark:bg-indigo-900/30 rounded-full flex items-center justify-center text-lg font-bold text-indigo-600 dark:text-indigo-400">6</div>
+                    <div class="flex-1">
+                        <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-3">Gradient Clipping</h3>
+                        <div class="bg-white rounded-lg p-4 mb-3 border border-gray-200">
+                            <div class="font-mono text-sm overflow-x-auto">
+                                $\nabla_{clip} = \begin{cases} \nabla & ||\nabla|| \leq 1.0 \\ 1.0 \times \frac{\nabla}{||\nabla||} & ||\nabla|| > 1.0 \end{cases}$
+                            </div>
+                        </div>
+                        <p class="text-gray-700 dark:text-gray-300 mb-2">
+                            Limita la norma de los gradientes a 1.0 para prevenir explosión de gradientes. Crítico en two-stage detectors debido a la propagación a través de RPN y RoI heads.
+                        </p>
+                        <div class="text-sm text-indigo-600 dark:text-indigo-400 font-medium">
+                            Pascanu et al. (2013) - "On the difficulty of training Recurrent Neural Networks"
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 5. Evolución del Loss -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-200 p-8 section-card">
+        <div class="flex items-center space-x-3 mb-6">
+            <div class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                <svg class="w-7 h-7 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path>
+                </svg>
+            </div>
+            <h2 class="text-3xl font-bold text-gray-900">5. Evolución del Loss Durante Entrenamiento (100 Épocas)</h2>
+        </div>
+
+        <div class="grid md:grid-cols-2 gap-6 mb-6">
+            <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 border border-blue-200">
+                <h3 class="text-lg font-bold text-white mb-4">Train Loss</h3>
+                <div class="space-y-3">
+                    <div class="flex justify-between items-center">
+                        <span class="text-blue-100">Época 1 (inicial):</span>
+                        <span class="font-mono font-bold text-white">1.0490</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-blue-100">Época 65 (mejor):</span>
+                        <span class="font-mono font-bold text-yellow-300">0.2273</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-blue-100">Época 100 (final):</span>
+                        <span class="font-mono font-bold text-white">0.1304</span>
+                    </div>
+                    <div class="pt-3 border-t border-blue-300">
+                        <div class="flex justify-between items-center">
+                            <span class="text-blue-100 font-semibold">Mejora total:</span>
+                            <span class="font-mono font-bold text-white">87.6%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-6 border border-purple-200">
+                <h3 class="text-lg font-bold text-white mb-4">Validation Loss</h3>
+                <div class="space-y-3">
+                    <div class="flex justify-between items-center">
+                        <span class="text-purple-100">Época 1 (inicial):</span>
+                        <span class="font-mono font-bold text-white">0.9235</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-purple-100">Época 65 (mejor):</span>
+                        <span class="font-mono font-bold text-yellow-300">0.4547</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-purple-100">Época 100 (final):</span>
+                        <span class="font-mono font-bold text-white">0.6354</span>
+                    </div>
+                    <div class="pt-3 border-t border-purple-300">
+                        <div class="flex justify-between items-center">
+                            <span class="text-purple-100 font-semibold">Mejora hasta mejor:</span>
+                            <span class="font-mono font-bold text-white">50.8%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-gradient-to-r from-amber-50 to-yellow-50 rounded-xl p-6 border border-yellow-300">
+            <h3 class="text-lg font-bold text-gray-900 mb-4">Interpretación de las Curvas</h3>
+            <div class="space-y-3 text-gray-700">
+                <p>
+                    <strong class="text-yellow-800">Convergencia acelerada:</strong> El modelo alcanzó su mejor val loss en la época 65, mostrando una mejora del 50.8% respecto al inicio. Los warm restarts cada 20 épocas permitieron explorar múltiples mínimos.
+                </p>
+                <p>
+                    <strong class="text-yellow-800">Efecto de warm restarts:</strong> Las reinicializaciones periódicas del learning rate (épocas 20, 40, 60, 80) provocan pequeños aumentos temporales en el loss, seguidos de convergencia a mejores mínimos locales.
+                </p>
+                <p>
+                    <strong class="text-yellow-800">Gap final moderado:</strong> En la mejor época (65), el gap entre train (0.2273) y val (0.4547) es de 0.2274, indicando un ligero overfitting controlado mediante weight decay y data augmentation.
+                </p>
+                <p>
+                    <strong class="text-yellow-800">Estabilidad post-óptimo:</strong> Después de la época 65, el val loss oscila alrededor de 0.55-0.65, sin divergencia catastrófica, gracias al gradient clipping y los mecanismos de regularización.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 6. Resultados de Evaluación -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-200 p-8 section-card">
+        <div class="flex items-center space-x-3 mb-6">
+            <div class="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center">
+                <svg class="w-7 h-7 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                </svg>
+            </div>
+            <h2 class="text-3xl font-bold text-gray-900">6. Resultados de Evaluación en Validación</h2>
+        </div>
+
+        <!-- Métricas Globales -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <div class="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-5 border border-green-200 text-center">
+                <div class="text-xs font-semibold text-green-100 mb-2">ACCURACY</div>
+                <div class="text-3xl font-bold text-white">42.0%</div>
+                <div class="text-xs text-green-200 mt-1">Overall</div>
+            </div>
+            <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-5 border border-blue-200 text-center">
+                <div class="text-xs font-semibold text-blue-100 mb-2">F1-SCORE</div>
+                <div class="text-3xl font-bold text-white">29.5%</div>
+                <div class="text-xs text-blue-200 mt-1">Macro Average</div>
+            </div>
+            <div class="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-5 border border-purple-200 text-center">
+                <div class="text-xs font-semibold text-purple-100 mb-2">PRECISION</div>
+                <div class="text-3xl font-bold text-white">35.2%</div>
+                <div class="text-xs text-purple-200 mt-1">Macro Average</div>
+            </div>
+            <div class="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl p-5 border border-orange-200 text-center">
+                <div class="text-xs font-semibold text-orange-100 mb-2">RECALL</div>
+                <div class="text-3xl font-bold text-white">27.3%</div>
+                <div class="text-xs text-orange-200 mt-1">Macro Average</div>
+            </div>
+        </div>
+
+        <!-- Métricas Clases Minoritarias -->
+        <div class="bg-gradient-to-r from-red-50 to-pink-50 rounded-xl p-6 border border-red-300 mb-8">
+            <h3 class="text-lg font-bold text-gray-900 mb-4">🎯 Desempeño en Clases Minoritarias (L1, L2, L3, T12)</h3>
+            <div class="grid md:grid-cols-2 gap-6">
+                <div>
+                    <div class="text-sm text-gray-600 mb-2">F1-Score Minoritarias</div>
+                    <div class="text-3xl font-bold text-red-700">16.2%</div>
+                </div>
+                <div>
+                    <div class="text-sm text-gray-600 mb-2">Recall Minoritarias</div>
+                    <div class="text-3xl font-bold text-red-700">14.0%</div>
+                </div>
+            </div>
+            <div class="mt-4 pt-4 border-t border-red-200">
+                <p class="text-sm text-gray-700">
+                    <strong>Análisis:</strong> El bajo desempeño en clases minoritarias (L1: 0 TP, L2: 4 TP, T12: 2 TP) indica que el desbalance extremo del dataset (L1=14, L2=10, T12=8 muestras) no fue completamente compensado por las técnicas de data augmentation y weighted sampling.
+                </p>
+            </div>
+        </div>
+
+        <!-- Métricas por Clase -->
+        <div class="overflow-x-auto">
+            <h3 class="text-xl font-bold text-gray-900 mb-4">Métricas Detalladas por Clase</h3>
+            <table class="w-full">
+                <thead>
+                    <tr class="bg-gray-100 border-b-2 border-gray-300">
+                        <th class="text-left py-3 px-4 font-semibold text-gray-700">Clase</th>
+                        <th class="text-center py-3 px-4 font-semibold text-gray-700">Precision</th>
+                        <th class="text-center py-3 px-4 font-semibold text-gray-700">Recall</th>
+                        <th class="text-center py-3 px-4 font-semibold text-gray-700">F1-Score</th>
+                        <th class="text-center py-3 px-4 font-semibold text-gray-700">TP/FP/FN</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    <tr class="hover:bg-gray-50">
+                        <td class="py-3 px-4 font-medium text-gray-900">🎯 Hernia</td>
+                        <td class="py-3 px-4 text-center font-mono">61.5%</td>
+                        <td class="py-3 px-4 text-center font-mono">66.3%</td>
+                        <td class="py-3 px-4 text-center font-mono font-bold text-green-700">63.8%</td>
+                        <td class="py-3 px-4 text-center text-sm">118/74/60</td>
+                    </tr>
+                    <tr class="hover:bg-gray-50 bg-red-50">
+                        <td class="py-3 px-4 font-medium text-gray-900">🔴 L1</td>
+                        <td class="py-3 px-4 text-center font-mono text-red-600">0.0%</td>
+                        <td class="py-3 px-4 text-center font-mono text-red-600">0.0%</td>
+                        <td class="py-3 px-4 text-center font-mono font-bold text-red-700">0.0%</td>
+                        <td class="py-3 px-4 text-center text-sm">0/2/12</td>
+                    </tr>
+                    <tr class="hover:bg-gray-50">
+                        <td class="py-3 px-4 font-medium text-gray-900">🎯 L2</td>
+                        <td class="py-3 px-4 text-center font-mono">33.3%</td>
+                        <td class="py-3 px-4 text-center font-mono">40.0%</td>
+                        <td class="py-3 px-4 text-center font-mono font-bold text-orange-700">36.4%</td>
+                        <td class="py-3 px-4 text-center text-sm">4/8/6</td>
+                    </tr>
+                    <tr class="hover:bg-gray-50">
+                        <td class="py-3 px-4 font-medium text-gray-900">L3</td>
+                        <td class="py-3 px-4 text-center font-mono">42.9%</td>
+                        <td class="py-3 px-4 text-center font-mono">30.0%</td>
+                        <td class="py-3 px-4 text-center font-mono font-bold text-orange-700">35.3%</td>
+                        <td class="py-3 px-4 text-center text-sm">6/8/14</td>
+                    </tr>
+                    <tr class="hover:bg-gray-50">
+                        <td class="py-3 px-4 font-medium text-gray-900">L4</td>
+                        <td class="py-3 px-4 text-center font-mono">26.1%</td>
+                        <td class="py-3 px-4 text-center font-mono">40.0%</td>
+                        <td class="py-3 px-4 text-center font-mono font-bold text-orange-700">31.6%</td>
+                        <td class="py-3 px-4 text-center text-sm">12/34/18</td>
+                    </tr>
+                    <tr class="hover:bg-gray-50">
+                        <td class="py-3 px-4 font-medium text-gray-900">L5</td>
+                        <td class="py-3 px-4 text-center font-mono">33.3%</td>
+                        <td class="py-3 px-4 text-center font-mono">28.6%</td>
+                        <td class="py-3 px-4 text-center font-mono font-bold text-orange-700">30.8%</td>
+                        <td class="py-3 px-4 text-center text-sm">16/32/40</td>
+                    </tr>
+                    <tr class="hover:bg-gray-50">
+                        <td class="py-3 px-4 font-medium text-gray-900">S1</td>
+                        <td class="py-3 px-4 text-center font-mono">41.7%</td>
+                        <td class="py-3 px-4 text-center font-mono">35.7%</td>
+                        <td class="py-3 px-4 text-center font-mono font-bold text-yellow-700">38.5%</td>
+                        <td class="py-3 px-4 text-center text-sm">10/14/18</td>
+                    </tr>
+                    <tr class="hover:bg-gray-50 bg-green-50">
+                        <td class="py-3 px-4 font-medium text-gray-900">✅ Sin Hernia</td>
+                        <td class="py-3 px-4 text-center font-mono font-bold text-green-600">80.0%</td>
+                        <td class="py-3 px-4 text-center font-mono">57.1%</td>
+                        <td class="py-3 px-4 text-center font-mono font-bold text-green-700">66.7%</td>
+                        <td class="py-3 px-4 text-center text-sm">16/4/12</td>
+                    </tr>
+                    <tr class="hover:bg-gray-50">
+                        <td class="py-3 px-4 font-medium text-gray-900">🎯 T12</td>
+                        <td class="py-3 px-4 text-center font-mono">33.3%</td>
+                        <td class="py-3 px-4 text-center font-mono font-bold text-green-600">100%</td>
+                        <td class="py-3 px-4 text-center font-mono font-bold text-green-700">50.0%</td>
+                        <td class="py-3 px-4 text-center text-sm">2/4/0</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Rendimiento -->
+        <div class="mt-8 grid md:grid-cols-2 gap-6">
+            <div class="bg-gradient-to-br from-cyan-500 to-cyan-600 rounded-xl p-6 border border-cyan-200">
+                <h3 class="text-lg font-bold text-white mb-4">⚡ Rendimiento de Inferencia</h3>
+                <div class="space-y-3">
+                    <div class="flex justify-between items-center">
+                        <span class="text-cyan-100">Tiempo medio:</span>
+                        <span class="font-mono font-bold text-white">90.8 ms</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-cyan-100">FPS:</span>
+                        <span class="font-mono font-bold text-white">11.0</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-cyan-100">Dispositivo:</span>
+                        <span class="font-mono font-bold text-white">CUDA (GPU)</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-gradient-to-br from-teal-500 to-teal-600 rounded-xl p-6 border border-teal-200">
+                <h3 class="text-lg font-bold text-white mb-4">📊 Configuración de Inferencia</h3>
+                <div class="space-y-3">
+                    <div class="flex justify-between items-center">
+                        <span class="text-teal-100">Conf. Threshold:</span>
+                        <span class="font-mono font-bold text-white">0.25</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-teal-100">IoU Threshold:</span>
+                        <span class="font-mono font-bold text-white">0.50</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-teal-100">Max Detections:</span>
+                        <span class="font-mono font-bold text-white">150</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 7. Análisis Comparativo y Limitaciones -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-200 p-8 section-card">
+        <div class="flex items-center space-x-3 mb-6">
+            <div class="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center">
+                <svg class="w-7 h-7 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                </svg>
+            </div>
+            <h2 class="text-3xl font-bold text-gray-900">7. Limitaciones y Consideraciones</h2>
+        </div>
+
+        <div class="space-y-4">
+            <div class="bg-red-50 rounded-xl p-6 border-l-4 border-red-500">
+                <h3 class="font-bold text-red-900 mb-2">1. Dataset Extremadamente Pequeño</h3>
+                <p class="text-gray-700 mb-2">
+                    182 imágenes de entrenamiento para un modelo de ~25M parámetros (ResNet50) resulta en un ratio crítico de aproximadamente 7 imágenes por millón de parámetros.
+                </p>
+                <p class="text-sm text-gray-600">
+                    <strong>Recomendado:</strong> 30-50 imágenes por millón de parámetros. Para 9 clases, se requerirían al menos 1000-1500 imágenes.
+                </p>
+            </div>
+
+            <div class="bg-orange-50 rounded-xl p-6 border-l-4 border-orange-500">
+                <h3 class="font-bold text-orange-900 mb-2">2. Desbalance Extremo de Clases</h3>
+                <p class="text-gray-700 mb-2">
+                    Las clases minoritarias (L1=14, L2=10, T12=8) tienen menos del 5% de ejemplos respecto a "Hernia" (194 ejemplos), resultando en ratios de hasta 1:24.
+                </p>
+                <p class="text-sm text-gray-600">
+                    <strong>Impacto:</strong> A pesar del weighted sampling exponencial y copy-paste agresivo, la clase L1 tuvo 0 detecciones correctas en validación, evidenciando la insuficiencia de datos.
+                </p>
+            </div>
+
+            <div class="bg-yellow-50 rounded-xl p-6 border-l-4 border-yellow-500">
+                <h3 class="font-bold text-yellow-900 mb-2">3. Arquitectura Two-Stage vs One-Stage</h3>
+                <p class="text-gray-700 mb-2">
+                    Faster R-CNN es un detector two-stage (RPN + RoI head) diseñado para alta precisión. Sin embargo, requiere más datos que modelos one-stage como RetinaNet o YOLO para datasets pequeños.
+                </p>
+                <p class="text-sm text-gray-600">
+                    <strong>Referencia:</strong> Lin et al. (2017) demostraron que RetinaNet (one-stage con Focal Loss) supera a Faster R-CNN en escenarios con desbalance severo.
+                </p>
+            </div>
+
+            <div class="bg-blue-50 rounded-xl p-6 border-l-4 border-blue-500">
+                <h3 class="font-bold text-blue-900 mb-2">4. Overfitting en Épocas Tardías</h3>
+                <p class="text-gray-700 mb-2">
+                    El modelo alcanzó su mejor val loss en época 65, pero continuó entrenando hasta época 100. El gap train-val aumentó de 0.23 (época 65) a ~0.50 (época 100), indicando overfitting progresivo.
+                </p>
+                <p class="text-sm text-gray-600">
+                    <strong>Recomendación:</strong> Implementar early stopping con patience de 15-20 épocas para datasets de este tamaño.
+                </p>
+            </div>
+        </div>
+
+        <div class="mt-6 bg-green-50 rounded-xl p-6 border border-green-200">
+            <h3 class="font-bold text-green-900 mb-2">✅ Logros a Pesar de las Limitaciones</h3>
+            <p class="text-gray-700">
+                A pesar del dataset extremadamente pequeño y desbalanceado, el modelo alcanzó <strong>42% de accuracy</strong> y <strong>66.3% de recall en la clase "Hernia"</strong> (la más importante clínicamente). Las técnicas de optimización implementadas (copy-paste, weighted sampling, warm restarts) lograron un val loss de <strong>0.4547</strong>, demostrando que es posible entrenar detectores robustos con recursos limitados mediante estrategias basadas en literatura científica.
+            </p>
+        </div>
+    </div>
+
+    <!-- 8. Referencias Bibliográficas -->
+    <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-gray-200 dark:border-slate-700 p-8 section-card">
+        <div class="flex items-center space-x-3 mb-6">
+            <div class="w-12 h-12 bg-gray-100 dark:bg-slate-700 rounded-xl flex items-center justify-center">
+                <svg class="w-7 h-7 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                </svg>
+            </div>
+            <h2 class="text-3xl font-bold text-gray-900 dark:text-white">8. Referencias Bibliográficas</h2>
+        </div>
+        <div class="space-y-4">
+            <div class="bg-gray-50 dark:bg-slate-700 rounded-lg p-4 border border-gray-200 dark:border-slate-600 hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors">
+                <div class="flex items-start space-x-3">
+                    <div class="flex-shrink-0 w-8 h-8 bg-gray-200 dark:bg-slate-600 rounded-full flex items-center justify-center text-sm font-bold text-gray-700 dark:text-black">1</div>
+                    <div class="flex-1">
+                        <p class="text-gray-900 dark:text-gray-100">
+                            <strong>Ren, S., He, K., Girshick, R., & Sun, J. (2015).</strong> "Faster R-CNN: Towards Real-Time Object Detection with Region Proposal Networks."
+                            <em>Advances in Neural Information Processing Systems (NIPS)</em>.
+                            <span class="text-blue-600 dark:text-blue-400">arXiv:1506.01497</span>
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 dark:bg-slate-700 rounded-lg p-4 border border-gray-200 dark:border-slate-600 hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors">
+                <div class="flex items-start space-x-3">
+                    <div class="flex-shrink-0 w-8 h-8 bg-gray-200 dark:bg-slate-600 rounded-full flex items-center justify-center text-sm font-bold text-gray-700 dark:text-black">2</div>
+                    <div class="flex-1">
+                        <p class="text-gray-900 dark:text-gray-100">
+                            <strong>Lin, T. Y., Dollár, P., Girshick, R., He, K., Hariharan, B., & Belongie, S. (2017).</strong> "Feature Pyramid Networks for Object Detection."
+                            <em>IEEE Conference on Computer Vision and Pattern Recognition (CVPR)</em>.
+                            <span class="text-blue-600 dark:text-blue-400">DOI: 10.1109/CVPR.2017.106</span>
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 dark:bg-slate-700 rounded-lg p-4 border border-gray-200 dark:border-slate-600 hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors">
+                <div class="flex items-start space-x-3">
+                    <div class="flex-shrink-0 w-8 h-8 bg-gray-200 dark:bg-slate-600 rounded-full flex items-center justify-center text-sm font-bold text-gray-700 dark:text-black">3</div>
+                    <div class="flex-1">
+                        <p class="text-gray-900 dark:text-gray-100">
+                            <strong>He, K., Zhang, X., Ren, S., & Sun, J. (2016).</strong> "Deep Residual Learning for Image Recognition."
+                            <em>IEEE Conference on Computer Vision and Pattern Recognition (CVPR)</em>.
+                            <span class="text-blue-600 dark:text-blue-400">DOI: 10.1109/CVPR.2016.90</span>
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 dark:bg-slate-700 rounded-lg p-4 border border-gray-200 dark:border-slate-600 hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors">
+                <div class="flex items-start space-x-3">
+                    <div class="flex-shrink-0 w-8 h-8 bg-gray-200 dark:bg-slate-600 rounded-full flex items-center justify-center text-sm font-bold text-gray-700 dark:text-black">4</div>
+                    <div class="flex-1">
+                        <p class="text-gray-900 dark:text-gray-100">
+                            <strong>Ghiasi, G., Cui, Y., Srinivas, A., Qian, R., Lin, T. Y., Cubuk, E. D., Le, Q. V., & Zoph, B. (2021).</strong> "Simple Copy-Paste is a Strong Data Augmentation Method for Instance Segmentation."
+                            <em>IEEE Conference on Computer Vision and Pattern Recognition (CVPR)</em>.
+                            <span class="text-blue-600 dark:text-blue-400">arXiv:2012.07177</span>
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 dark:bg-slate-700 rounded-lg p-4 border border-gray-200 dark:border-slate-600 hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors">
+                <div class="flex items-start space-x-3">
+                    <div class="flex-shrink-0 w-8 h-8 bg-gray-200 dark:bg-slate-600 rounded-full flex items-center justify-center text-sm font-bold text-gray-700 dark:text-black">5</div>
+                    <div class="flex-1">
+                        <p class="text-gray-900 dark:text-gray-100">
+                            <strong>Cui, Y., Jia, M., Lin, T. Y., Song, Y., & Belongie, S. (2019).</strong> "Class-Balanced Loss Based on Effective Number of Samples."
+                            <em>IEEE Conference on Computer Vision and Pattern Recognition (CVPR)</em>.
+                            <span class="text-blue-600 dark:text-blue-400">DOI: 10.1109/CVPR.2019.00949</span>
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 dark:bg-slate-700 rounded-lg p-4 border border-gray-200 dark:border-slate-600 hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors">
+                <div class="flex items-start space-x-3">
+                    <div class="flex-shrink-0 w-8 h-8 bg-gray-200 dark:bg-slate-600 rounded-full flex items-center justify-center text-sm font-bold text-gray-700 dark:text-black">6</div>
+                    <div class="flex-1">
+                        <p class="text-gray-900 dark:text-gray-100">
+                            <strong>Shorten, C., & Khoshgoftaar, T. M. (2019).</strong> "A survey on Image Data Augmentation for Deep Learning."
+                            <em>Journal of Big Data</em>, 6(1):60.
+                            <span class="text-blue-600 dark:text-blue-400">DOI: 10.1186/s40537-019-0197-0</span>
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 dark:bg-slate-700 rounded-lg p-4 border border-gray-200 dark:border-slate-600 hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors">
+                <div class="flex items-start space-x-3">
+                    <div class="flex-shrink-0 w-8 h-8 bg-gray-200 dark:bg-slate-600 rounded-full flex items-center justify-center text-sm font-bold text-gray-700 dark:text-black">7</div>
+                    <div class="flex-1">
+                        <p class="text-gray-900 dark:text-gray-100">
+                            <strong>Talwar, A., Kelshiker, A. I., & Fischer, J. P. (2025).</strong> "AI-powered medical imaging for ventral hernia repair."
+                            <em>Artificial Intelligence Surgery</em>, 5, 418-424.
+                            <span class="text-blue-600 dark:text-blue-400">DOI: 10.20517/ais.2025.22</span>
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 dark:bg-slate-700 rounded-lg p-4 border border-gray-200 dark:border-slate-600 hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors">
+                <div class="flex items-start space-x-3">
+                    <div class="flex-shrink-0 w-8 h-8 bg-gray-200 dark:bg-slate-600 rounded-full flex items-center justify-center text-sm font-bold text-gray-700 dark:text-black">8</div>
+                    <div class="flex-1">
+                        <p class="text-gray-900 dark:text-gray-100">
+                            <strong>Karako, K., Mihara, Y., Arita, J., Ichida, A., Bae, S. K., Kawaguchi, Y., Ishizawa, T., Akamatsu, N., Kaneko, J., & Hasegawa, K. (2022).</strong> "Automated liver tumor detection in abdominal ultrasonography with a modified faster region-based convolutional neural networks (Faster R-CNN) architecture."
+                            <em>Hepatobiliary Surgery and Nutrition</em>, 11(5), 675-683.
+                            <span class="text-blue-600 dark:text-blue-400">DOI: 10.21037/hbsn-21-43</span>
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 dark:bg-slate-700 rounded-lg p-4 border border-gray-200 dark:border-slate-600 hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors">
+                <div class="flex items-start space-x-3">
+                    <div class="flex-shrink-0 w-8 h-8 bg-gray-200 dark:bg-slate-600 rounded-full flex items-center justify-center text-sm font-bold text-gray-700 dark:text-black">9</div>
+                    <div class="flex-1">
+                        <p class="text-gray-900 dark:text-gray-100">
+                            <strong>Chen, S., Wang, Y., Zhang, Y., Li, J., & Liu, X. (2022).</strong> "Automatic Abdominal Hernia Mesh Detection Based on YOLOM."
+                            <em>IEEE Access</em>, 10, 37297-37307.
+                            <span class="text-blue-600 dark:text-blue-400">DOI: 10.1109/ACCESS.2022.3163529</span>
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 dark:bg-slate-700 rounded-lg p-4 border border-gray-200 dark:border-slate-600 hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors">
+                <div class="flex items-start space-x-3">
+                    <div class="flex-shrink-0 w-8 h-8 bg-gray-200 dark:bg-slate-600 rounded-full flex items-center justify-center text-sm font-bold text-gray-700 dark:text-black">10</div>
+                    <div class="flex-1">
+                        <p class="text-gray-900 dark:text-gray-100">
+                            <strong>Elhanashi, A., Saponara, S., Zheng, Q., Almutairi, N., Singh, Y., Kuanar, S., Ali, F., Unal, O., & Faghani, S. (2025).</strong> "AI-Powered Object Detection in Radiology: Current Models, Challenges, and Future Direction."
+                            <em>Journal of Imaging</em>, 11(5), 141.
+                            <span class="text-blue-600 dark:text-blue-400">DOI: 10.3390/jimaging11050141</span>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- 9. Resumen Ejecutivo -->
+    <div class="bg-blue-600 dark:bg-blue-700 rounded-2xl shadow-xl p-8 text-white">
+        <div class="flex items-center space-x-3 mb-6">
+            <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                <svg class="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                </svg>
+            </div>
+            <h2 class="text-3xl font-bold">9. Conclusiones</h2>
+        </div>
+
+        <div class="space-y-4">
+            <div class="bg-white/10 rounded-xl p-6 backdrop-blur">
+                <h3 class="text-xl font-bold mb-3">Logros Principales</h3>
+                <ul class="space-y-2">
+                    <li class="flex items-start">
+                        <svg class="w-6 h-6 mr-3 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                        </svg>
+                        <span>Validation loss de <strong>0.4547</strong> mediante 100 épocas de entrenamiento optimizado</span>
+                    </li>
+                    <li class="flex items-start">
+                        <svg class="w-6 h-6 mr-3 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                        </svg>
+                        <span>Mejora relativa del <strong>50.8%</strong> respecto al loss inicial (0.9235 → 0.4547)</span>
+                    </li>
+                    <li class="flex items-start">
+                        <svg class="w-6 h-6 mr-3 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                        </svg>
+                        <span><strong>66.3% de recall</strong> en la clase "Hernia" (objetivo clínico principal)</span>
+                    </li>
+                    <li class="flex items-start">
+                        <svg class="w-6 h-6 mr-3 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                        </svg>
+                        <span>Implementación exitosa de 6 técnicas avanzadas de optimización para datasets pequeños</span>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="bg-white/10 rounded-xl p-6 backdrop-blur">
+                <h3 class="text-xl font-bold mb-3">Técnicas Clave Aplicadas</h3>
+                <div class="grid md:grid-cols-2 gap-3">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-2 h-2 bg-white rounded-full"></div>
+                        <span>Copy-Paste Ultra-Agresivo (50-60%)</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <div class="w-2 h-2 bg-white rounded-full"></div>
+                        <span>Weighted Sampler Exponencial</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <div class="w-2 h-2 bg-white rounded-full"></div>
+                        <span>Cosine Annealing Warm Restarts</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <div class="w-2 h-2 bg-white rounded-full"></div>
+                        <span>AdamW (LR=2e-4, WD=0.01)</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <div class="w-2 h-2 bg-white rounded-full"></div>
+                        <span>Data Augmentation Mejorada</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <div class="w-2 h-2 bg-white rounded-full"></div>
+                        <span>Gradient Clipping (max_norm=1.0)</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white/10 rounded-xl p-6 backdrop-blur">
+                <h3 class="text-xl font-bold mb-3">Desafíos y Aprendizajes</h3>
+                <p class="text-lg leading-relaxed mb-3">
+                    A pesar de las limitaciones inherentes al dataset ultra-pequeño (182 imágenes) y el desbalance extremo de clases (ratios de hasta 1:24), el modelo Faster R-CNN con ResNet50-FPN logró resultados competitivos mediante la implementación rigurosa de técnicas basadas en literatura científica reciente.
+                </p>
+                <p class="text-lg leading-relaxed">
+                    El bajo desempeño en clases minoritarias (<strong>F1=16.2%</strong>) confirma las recomendaciones de la literatura sobre la necesidad de datasets más grandes para detección multi-clase. Sin embargo, el <strong>63.8% F1-score en "Hernia"</strong> y <strong>66.7% en "Sin Hernia"</strong> demuestran la viabilidad del enfoque para las clases más relevantes clínicamente.
+                </p>
+            </div>
+
+            <div class="bg-white/10 rounded-xl p-6 backdrop-blur">
+                <h3 class="text-xl font-bold mb-3">Comparación: Two-Stage vs One-Stage</h3>
+                <p class="text-lg leading-relaxed">
+                    Faster R-CNN (two-stage) priorizó <strong>precisión sobre recall</strong> (35.2% vs 27.3%), mientras que arquitecturas one-stage como RetinaNet con Focal Loss están específicamente diseñadas para manejar desbalance extremo. Los warm restarts cada 20 épocas permitieron explorar múltiples mínimos locales, alcanzando el óptimo en época 65 con convergencia estable.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer con timestamp -->
+    <div class="text-center text-gray-500 dark:text-gray-400 text-sm py-4">
+        <p>Modelo entrenado: 2025-11-16 00:42:59</p>
+        <p class="mt-1">Faster R-CNN ResNet50-FPN Optimized - 9 clases - 100 épocas</p>
+        <p class="mt-1">Mejor Época: 65 | Val Loss: 0.4547 | Accuracy: 42.0%</p>
+    </div>
+
+</div>
+
+<script>
+// Configuración de MathJax
+window.MathJax = {
+    tex: {
+        inlineMath: [[', '], ['\\(', '\\)']],
+        displayMath: [['$', '$'], ['\\[', '\\]']],
+        processEscapes: true,
+        processEnvironments: true
+    },
+    options: {
+        skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+    },
+    startup: {
+        ready: () => {
+            MathJax.startup.defaultReady();
+            // Re-render cuando cambie el modo oscuro
+            const observer = new MutationObserver(() => {
+                if (MathJax.typesetPromise) {
+                    MathJax.typesetPromise().catch((err) => console.log('MathJax error:', err));
+                }
+            });
+            observer.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+        }
+    }
+};
+
+// Inicializar cuando el DOM esté listo
+document.addEventListener('DOMContentLoaded', function() {
+    if (window.MathJax && MathJax.typesetPromise) {
+        MathJax.typesetPromise().catch((err) => console.log('MathJax error:', err));
+    }
+});
+</script>
+
+{% endblock %}

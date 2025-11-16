@@ -31,6 +31,7 @@ urlpatterns = [
     path('comparacion/', views.comparacion_view, name='comparacion'),
     path('modelos/retinanet/', views.modelo_retinanet_view, name='modelo_retinanet'),
     path('modelos/yolov12/', views.modelo_yolov12_view, name='modelo_yolov12'),
+    path('modelos/resnet50/', views.modelo_resnet50_view, name='modelo_resnet50'),
 
     
     # URLs para el restablecimiento de contraseñas
