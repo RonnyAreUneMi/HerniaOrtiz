@@ -490,8 +490,11 @@ def comparacion_view(request):
         try:
             with open(retinanet_file, 'r', encoding='utf-8') as f:
                 model_data['retinanet'] = json.load(f)
+                logger.info('RetinaNet data cargado exitosamente')
         except Exception as e:
             logger.error(f"Error cargando RetinaNet data: {str(e)}")
+    else:
+        logger.warning(f"Archivo RetinaNet no encontrado: {retinanet_file}")
     
     # Cargar YOLO
     yolo_file = os.path.join(data_dir, 'Yolo_detect_3.json')
@@ -499,8 +502,30 @@ def comparacion_view(request):
         try:
             with open(yolo_file, 'r', encoding='utf-8') as f:
                 model_data['yolo'] = json.load(f)
+                logger.info('YOLO data cargado exitosamente')
         except Exception as e:
             logger.error(f"Error cargando YOLO data: {str(e)}")
+    else:
+        logger.warning(f"Archivo YOLO no encontrado: {yolo_file}")
+    
+    # Cargar ResNet50
+    resnet50_file = os.path.join(data_dir, 'Resnet50.json')
+    if os.path.exists(resnet50_file):
+        try:
+            with open(resnet50_file, 'r', encoding='utf-8') as f:
+                model_data['resnet50'] = json.load(f)
+                logger.info('ResNet50 data cargado exitosamente')
+        except Exception as e:
+            logger.error(f"Error cargando ResNet50 data: {str(e)}")
+    else:
+        logger.warning(f"Archivo ResNet50 no encontrado: {resnet50_file}")
+    
+    # Verificar si se cargó al menos un modelo
+    if not model_data:
+        logger.error('No se pudo cargar ningún modelo')
+        messages.warning(request, 'No se encontraron datos de modelos para comparar.')
+    else:
+        logger.info(f'Modelos cargados exitosamente: {", ".join(model_data.keys())}')
     
     # Serializar los datos como JSON para el template
     model_data_json = json.dumps(model_data)
@@ -588,4 +613,47 @@ def modelo_yolov12_view(request):
     return render(request, 'dashboard/yolov12.html', {
         'yolov12_data': yolov12_data,
         'yolov12_data_json': yolov12_data_json
+    })
+
+@login_required
+@require_http_methods(["GET"])
+def modelo_resnet50_view(request):
+    """
+    Vista para mostrar detalles específicos del modelo ResNet50.
+    Muestra métricas detalladas, gráficos de entrenamiento y rendimiento.
+    """
+    import json
+    import os
+    from django.conf import settings
+    from django.contrib import messages
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    # Cargar datos del modelo ResNet50
+    resnet50_data = None
+    data_dir = os.path.join(settings.BASE_DIR, 'app', 'Hernia', 'static', 'data')
+    resnet50_file = os.path.join(data_dir, 'Resnet50.json')
+
+    if os.path.exists(resnet50_file):
+        try:
+            with open(resnet50_file, 'r', encoding='utf-8') as f:
+                resnet50_data = json.load(f)
+        except Exception as e:
+            logger.error(f"Error cargando ResNet50 data: {str(e)}")
+            messages.error(request, 'Error al cargar los datos del modelo ResNet50.')
+    else:
+        messages.error(request, 'No se encontró el archivo de datos del modelo ResNet50.')
+        return redirect('comparacion')
+
+    if not resnet50_data:
+        messages.error(request, 'No se encontraron datos del modelo ResNet50.')
+        return redirect('comparacion')
+
+    # Serializar los datos como JSON para el template
+    resnet50_data_json = json.dumps(resnet50_data)
+
+    return render(request, 'dashboard/resnet50.html', {
+        'resnet50_data': resnet50_data,
+        'resnet50_data_json': resnet50_data_json
     })
